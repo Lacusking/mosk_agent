@@ -31,14 +31,18 @@
 
 ## Components
 
-- `backend`:
-  - 项目目录与入口脚手架
+- `src/core`:
+  - 通用类型/枚举、结构化异常基类、基础工具函数
   - 配置模块（settings/env）与日志初始化
-  - core 基础库（types/errors/utils）
-  - 基础模型抽象（BaseModel + 通用字段）
-  - 存储连接组件（db session/redis client）
-- `database`:
+- `src/contracts`:
+  - 基础模型抽象（BaseModel + 通用字段）、序列化约定
+- `src/storage`:
+  - 存储连接组件（PostgreSQL/SQLAlchemy session、Redis client）
   - 基础 migration 骨架与连接验证
+- `src/api`:
+  - FastAPI 入口脚手架与健康检查端点
+- `src/cli`:
+  - Typer CLI 入口脚手架与诊断命令
 - `testing`:
   - 初始化链路 smoke test（启动、配置、连接、工具函数）
 - `docs`:

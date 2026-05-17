@@ -5,9 +5,34 @@ src/
 ├── access/              # 接入层：统一处理 Web/API/CLI/Webhook/A2A/MCP 等入口请求，做请求归一化
 ├── identity/            # 身份与租户：用户、租户、组织、项目、角色、API Key、RBAC/ABAC 权限模型
 ├── api/                 # HTTP API 服务：FastAPI 路由、依赖注入、接口 schema、管理端 API
+│   ├── app.py           # FastAPI 应用入口
+│   ├── run.py           # 开发环境启动入口（uvicorn）
+│   ├── registrar.py     # 应用注册（日志、中间件、路由、异常处理、扩展）
+│   ├── exception_handler.py  # 全局异常处理
+│   ├── response.py      # 统一响应模型（{code, msg, data}）
+│   ├── controllers/     # 路由与接口
+│   │   ├── dep/         # 依赖注入（db_session, auth）
+│   │   └── v1/          # 版本化路由（router, health）
+│   ├── middlewares/      # 中间件（request_id 注入）
+│   ├── schemas/         # Pydantic 请求/响应 Schema
+│   └── extensions/      # 扩展组件系统
+│       ├── extension_manager.py  # 自动发现 register/clean 钩子
+│       └── extension_http/       # httpx 连接池扩展
 ├── cli/                 # 命令行工具：本地运行 Agent、调试任务、回放轨迹、执行评估
+│   └── main.py          # Typer CLI 入口
 ├── core/                # 公共基础组件：通用类型、枚举、异常、ID 生成、时间、JSON、Result 封装
+│   ├── config.py        # 集中配置加载（Pydantic Settings）
+│   ├── logging.py       # 结构化日志（JSON/彩色控制台/文件）
+│   ├── context.py       # 请求上下文（request_id/trace_id）
+│   ├── types.py         # 通用类型/枚举
+│   ├── errors.py        # 结构化异常体系
+│   ├── utils.py         # 基础工具函数
+│   ├── httpx_client.py  # 异步 HTTP 客户端管理（多连接池、重试）
+│   ├── retry.py         # 指数退避重试装饰器
+│   └── async_task.py    # 异步任务队列（Worker Pool）
 ├── contracts/           # 统一协议与数据契约：Message、Task、Event、Tool、Agent、Memory 等 Pydantic Schema
+│   ├── base.py          # ORM 基础模型（PkModel、TimestampedModel）
+│   └── orm_types.py     # 自定义 ORM 枚举类型
 │
 ├── runtime/             # Agent 运行时内核：事件循环、调度器、状态机、Step Runner、Checkpoint、Replay
 ├── events/              # 事件系统：Event Sourcing、Event Store、Event Bus、事件流、事件处理器
@@ -46,8 +71,21 @@ src/
 ├── control_plane/       # 控制面：Agent、Skill、Tool、Prompt、Policy、Memory、Eval、Deployment 的管理服务
 ├── deployment/          # 部署与版本：Agent/Skill/Prompt/Policy 发布、环境绑定、灰度、回滚、lockfile
 ├── storage/             # 存储层：PostgreSQL、Redis、对象存储、向量库、Repository、ORM Model
+│   ├── database.py      # SQLAlchemy 异步引擎与会话工厂
+│   └── redis.py         # Redis 异步客户端
 ├── workers/             # 异步 Worker：Runtime Worker、Tool Worker、Memory Worker、Sandbox Worker、Eval Worker
 └── plugins/             # 插件系统：第三方 Tool、Skill、Hook、Model Adapter、Connector 的加载与扩展机制
+
+alembic/                 # 数据库迁移
+├── alembic.ini          # Alembic 配置
+├── env.py               # 迁移环境（异步 SQLAlchemy）
+├── script.py.mako       # 迁移脚本模板
+└── versions/            # 迁移版本文件
+
+tests/                   # 测试
+├── core/                # core 模块单测
+├── storage/             # storage 模块单测
+└── integration/         # 集成测试
 ```
 
 ## 架构分层说明
@@ -85,3 +123,40 @@ src/
 4. **Skill 即能力单元** - 将 Prompt + Tool + Workflow + Policy 打包为可复用技能
 5. **A2A/MCP 边界清晰** - multi_agent 处理协议边界，agents 处理内部抽象
 6. **全链路可观测** - observability 覆盖执行轨迹、成本、Token 使用
+
+## 开发命令
+
+```bash
+make help              # 显示所有可用命令
+make install           # 安装依赖
+make dev               # 安装开发依赖
+make run               # 启动开发服务器 (uvicorn, port 7000)
+make cli ARGS="health" # 运行 CLI 命令
+make test              # 运行测试
+make lint              # 代码检查
+make format            # 代码格式化
+make migrate           # 执行数据库迁移
+make migrate-new MSG="description"  # 创建新迁移
+make migrate-rollback  # 回滚上一次迁移
+```
+
+## 环境变量
+
+参见 `.env.example`，关键配置项：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `ENVIRONMENT` | `dev` | 运行环境 (dev/staging/production) |
+| `LOG_LEVEL` | `INFO` | 日志级别 |
+| `DB_HOST` | `localhost` | PostgreSQL 地址 |
+| `DB_PORT` | `5432` | PostgreSQL 端口 |
+| `DB_NAME` | `mosk_agent` | 数据库名 |
+| `REDIS_HOST` | `localhost` | Redis 地址 |
+| `REDIS_PORT` | `6379` | Redis 端口 |
+
+## 验收步骤
+
+1. `cp .env.example .env` 并按需修改
+2. `make dev` 安装依赖
+3. `make test` 确认测试通过
+4. `make run` 启动服务，访问 `http://localhost:7000/api/v1/health`

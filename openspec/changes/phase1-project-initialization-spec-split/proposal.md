@@ -7,7 +7,7 @@
 - 新增“阶段 1 项目初始化”能力拆分，覆盖 0.1~0.5 五个初始化子阶段。
 - 为每个子阶段定义独立需求场景、失败场景与验收标准。
 - 输出统一设计文档，明确模块边界、依赖顺序与里程碑验证方式。
-- 输出可执行任务清单，按 backend/database/testing/docs 拆分并附验证步骤。
+- 输出可执行任务清单，按 src/<模块名>/database/testing/docs 拆分并附验证步骤。
 
 ## Capabilities
 
@@ -23,7 +23,7 @@
 
 ## Impact
 
-- Affected modules: `backend`, `database`, `testing`, `docs`
+- Affected modules: `src/core`, `src/storage`, `src/api`, `src/cli`, `database`, `testing`, `docs`
 - API 兼容性影响：无新增外部业务 API，仅可能新增健康检查或内部探活端点
 - 配置变更风险：新增环境变量与默认配置，需提供安全默认值
 - 数据迁移风险：可能新增基础表或迁移脚本骨架，需提供回滚路径

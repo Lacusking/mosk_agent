@@ -174,7 +174,7 @@ MVP 方案应遵循以下分层：
 后续所有 OpenSpec 变更（proposal/spec/design/tasks）需遵循：
 - 与第 4 节 MVP 边界保持一致
 - 与第 8 节开发级别一致（标明 P0/P1/P2）
-- 明确受影响模块（backend/frontend/database/devops/docs）
+- 明确受影响模块（src/<模块名>/testing/database/devops/docs）
 - 若涉及数据库变更，必须包含 migration 与回滚策略
 - 每个任务必须给出可执行验证方式（命令或手工路径）
 - 不允许“顺手重构”无关模块

@@ -196,6 +196,9 @@ cython_debug/
 # mac
 .DS_Store
 
+# logs
+logs/
+
 # ai generated files
 .claude
 .codex
