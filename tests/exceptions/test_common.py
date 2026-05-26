@@ -1,14 +1,12 @@
-"""结构化异常测试。"""
+"""平台通用结构化异常测试。"""
 
-import pytest
-
-from src.core.errors import AuthenticationError
-from src.core.errors import BaseError
-from src.core.errors import ConfigurationError
-from src.core.errors import ForbiddenError
-from src.core.errors import NotFoundError
-from src.core.errors import StorageError
-from src.core.errors import ValidationError
+from src.exceptions import AuthenticationError
+from src.exceptions import BaseError
+from src.exceptions import ConfigurationError
+from src.exceptions import ForbiddenError
+from src.exceptions import NotFoundError
+from src.exceptions import StorageError
+from src.exceptions import ValidationError
 
 
 class TestBaseError:
@@ -24,15 +22,11 @@ class TestBaseError:
 
     def test_to_dict(self) -> None:
         err = BaseError(msg="测试", data={"x": 1})
-        d = err.to_dict()
-        assert d["code"] == 50000
-        assert d["msg"] == "测试"
-        assert d["data"] == {"x": 1}
+        assert err.to_dict() == {"code": 50000, "msg": "测试", "data": {"x": 1}}
 
     def test_to_dict_without_data(self) -> None:
         err = BaseError(msg="测试")
-        d = err.to_dict()
-        assert "data" not in d
+        assert err.to_dict() == {"code": 50000, "msg": "测试"}
 
     def test_is_exception(self) -> None:
         err = BaseError(msg="test")
@@ -57,17 +51,13 @@ class TestSpecificErrors:
         assert err.msg == "用户不存在"
 
     def test_authentication_error(self) -> None:
-        err = AuthenticationError()
-        assert err.code == 40100
+        assert AuthenticationError().code == 40100
 
     def test_forbidden_error(self) -> None:
-        err = ForbiddenError()
-        assert err.code == 40300
+        assert ForbiddenError().code == 40300
 
     def test_configuration_error(self) -> None:
-        err = ConfigurationError()
-        assert err.code == 50001
+        assert ConfigurationError().code == 50001
 
     def test_storage_error(self) -> None:
-        err = StorageError()
-        assert err.code == 50002
+        assert StorageError().code == 50002

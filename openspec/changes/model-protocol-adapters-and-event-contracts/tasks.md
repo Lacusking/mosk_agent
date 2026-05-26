@@ -1,8 +1,8 @@
 ## 1. 平台异常入口迁移（src/exceptions, src/core, src/api, testing）
 
-- [ ] 1.1 [platform-exceptions-foundation][src/exceptions] 建立 `BaseError`、公共异常与 `ModelError` 专属层级，包含 provider/model/operation、retryable、fallback 与 provider 诊断字段；验证：`pytest -q tests/exceptions` 覆盖公共序列化和模型错误分类。
-- [ ] 1.2 [platform-exceptions-foundation][src/api, src/core] 将 API exception handler、鉴权依赖与 core 对异常的导入迁移到 `src.exceptions`，移除 `src.core.errors` 公共入口；验证：`rg "src\\.core\\.errors" src tests` 无应用依赖且 `pytest -q tests/core tests/api` 通过。
-- [ ] 1.3 [platform-exceptions-foundation][testing] 增加模型错误安全与判定字段测试，覆盖限流/超时可重试、认证/能力错误不可重试及敏感凭证不出现在公开数据中；验证：`pytest -q tests/exceptions -k model` 通过。
+- [x] 1.1 [platform-exceptions-foundation][src/exceptions] 建立 `BaseError`、公共异常与 `ModelError` 专属层级，包含 provider/model/operation、retryable、fallback 与 provider 诊断字段；验证：`pytest -q tests/exceptions` 覆盖公共序列化和模型错误分类。
+- [x] 1.2 [platform-exceptions-foundation][src/api, src/core] 将 API exception handler、鉴权依赖与 core 对异常的导入迁移到 `src.exceptions`，移除 `src.core.errors` 公共入口；验证：`rg "src\\.core\\.errors" src tests` 无应用依赖且 `pytest -q tests/core tests/api` 通过。
+- [x] 1.3 [platform-exceptions-foundation][testing] 增加模型错误安全与判定字段测试，覆盖限流/超时可重试、认证/能力错误不可重试及敏感凭证不出现在公开数据中；验证：`pytest -q tests/exceptions -k model` 通过。
 
 ## 2. 模型与事件公开契约（src/contracts, testing）
 
