@@ -30,9 +30,13 @@ src/
 │   ├── httpx_client.py  # 异步 HTTP 客户端管理（多连接池、重试）
 │   ├── retry.py         # 指数退避重试装饰器
 │   └── async_task.py    # 异步任务队列（Worker Pool）
-├── contracts/           # 统一协议与数据契约：Message、Task、Event、Tool、Agent、Memory 等 Pydantic Schema
-│   ├── base.py          # ORM 基础模型（PkModel、TimestampedModel）
-│   └── orm_types.py     # 自定义 ORM 枚举类型
+├── contracts/           # 跨模块契约命名空间，按数据持久化与运行时职责分域
+│   ├── database/        # 数据库映射契约
+│   │   ├── base.py      # ORM 基础模型（PkModel、TimestampedModel）
+│   │   └── orm_types.py # 自定义 ORM 枚举类型
+│   └── runtime/         # Agent runtime 公开数据契约
+│       ├── messages.py  # 模型消息与 content blocks
+│       └── models.py    # 模型请求、响应、usage 与流事件
 │
 ├── runtime/             # Agent 运行时内核：事件循环、调度器、状态机、Step Runner、Checkpoint、Replay
 ├── events/              # 事件系统：Event Sourcing、Event Store、Event Bus、事件流、事件处理器

@@ -150,18 +150,21 @@ sanitized_data?
 
 这些字段用于后续 runtime 判断，不包含 credentials、authorization headers 或未经清洗的原始 body。
 
-### `src/contracts`：跨模块公开 schema
+### `src/contracts/runtime`：模型运行时跨模块公开 schema
 
-为保持目录简洁并与当前 LLD 接近，本次使用以下 contract 模块：
+数据库 ORM contract 已归入 `src/contracts/database`。本次新增的模型运行时 contract
+归入独立子包，以免持久化映射与 runtime 协议混放：
 
 ```text
 contracts/
-├── messages.py       # ModelMessage 与 content blocks
-├── models.py         # capabilities、options、request/response、tool、usage、stream
-└── events.py         # RuntimeEvent envelope 与模型生命周期 payload
+├── database/         # ORM 基础模型与数据库类型
+└── runtime/
+    ├── messages.py   # ModelMessage 与 content blocks
+    ├── models.py     # capabilities、options、request/response、tool、usage、stream
+    └── events.py     # RuntimeEvent envelope 与模型生命周期 payload
 ```
 
-模型工具声明和模型返回的 tool-call intent 暂时归属 `contracts/models.py`。它们描述模型交互协议，而非工具执行权限或 sandbox 行为；后续工具系统可复用这些公开类型。
+模型工具声明和模型返回的 tool-call intent 暂时归属 `contracts/runtime/models.py`。它们描述模型交互协议，而非工具执行权限或 sandbox 行为；后续工具系统可复用这些公开类型。
 
 ### `src/models`：模型 adapter 层
 
@@ -196,7 +199,7 @@ models/
 
 ### `src/events`：事件发现入口
 
-本次不实现事件基础设施。`src/events/__init__.py` 可暴露模型事件类型或公开 contracts 以便后续模块发现，但事件 schema 的正式归属为 `src/contracts/events.py`。
+本次不实现事件基础设施。`src/events/__init__.py` 可暴露模型事件类型或公开 contracts 以便后续模块发现，但事件 schema 的正式归属为 `src/contracts/runtime/events.py`。
 
 ## 接口（APIs）
 
@@ -641,7 +644,8 @@ adapter 报告一次调用的 usage，并通过 `ModelError` 提供 `retryable` 
 |---|---|
 | `src/api` | `BaseError` 等导入迁移至 `src.exceptions`；不新增模型 API |
 | `src/core` | 不再拥有异常定义；仍拥有配置、日志、context 与通用工具 |
-| `src/contracts` | 新增模型与事件的全部跨模块 schema |
+| `src/contracts/database` | 承载既有 ORM 基础模型与数据库类型，不混入 runtime payload |
+| `src/contracts/runtime` | 新增模型与事件的全部跨模块 schema |
 | `src/models` | 新增 adapter、selector/profile、协议、transport、parser 与 reducer |
 | `src/events` | 仅提供事件 contract/type 的发现入口；无持久化实现 |
 | 后续 `src/runtime` | 消费 `ModelResponse`、`ModelStreamEvent` 与 `ModelError`，并根据 contracts 构造事实事件 |

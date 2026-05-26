@@ -1,10 +1,8 @@
-"""contracts 基础模型测试。"""
+"""数据库 ORM contracts 基础模型测试。"""
 
-from uuid import UUID
-
-from src.contracts.base import BaseModel
-from src.contracts.base import PkModel
-from src.contracts.base import TimestampedModel
+from src.contracts.database import BaseModel
+from src.contracts.database import PkModel
+from src.contracts.database import TimestampedModel
 
 
 class TestBaseModel:
@@ -23,8 +21,6 @@ class TestPkModel:
         assert PkModel.__abstract__ is True
 
     def test_has_id_column(self) -> None:
-        columns = {c.name for c in PkModel.__table__.columns} if hasattr(PkModel, "__table__") else set()
-        # PkModel is abstract, check via column definitions
         assert "id" in PkModel.__dict__ or hasattr(PkModel, "id")
 
 

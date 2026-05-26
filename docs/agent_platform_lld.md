@@ -148,7 +148,7 @@ src/agent_platform/
 
 所有跨模块 Schema 优先放在 `contracts/`，模块内部可有私有 schema，但外部交互必须使用 contracts。
 
-### 5.1 `contracts/messages.py`
+### 5.1 `contracts/runtime/messages.py`
 
 ```python
 from typing import Any, Literal
@@ -227,7 +227,7 @@ class TaskStep(BaseModel):
     updated_at: datetime
 ```
 
-### 5.4 `contracts/events.py`
+### 5.4 `contracts/runtime/events.py`
 
 ```python
 from typing import Any
@@ -249,7 +249,7 @@ class RuntimeEvent(BaseModel):
     created_at: datetime
 ```
 
-### 5.5 `contracts/models.py`
+### 5.5 `contracts/runtime/models.py`
 
 ```python
 from typing import Any, Literal
@@ -2361,4 +2361,3 @@ deployment 锁定版本
 ```
 
 该设计可在不依赖外部 Agent 框架的前提下，形成自研 Agent Platform 的稳定技术底座。
-

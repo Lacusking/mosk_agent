@@ -4,11 +4,11 @@
 - [x] 1.2 [platform-exceptions-foundation][src/api, src/core] 将 API exception handler、鉴权依赖与 core 对异常的导入迁移到 `src.exceptions`，移除 `src.core.errors` 公共入口；验证：`rg "src\\.core\\.errors" src tests` 无应用依赖且 `pytest -q tests/core tests/api` 通过。
 - [x] 1.3 [platform-exceptions-foundation][testing] 增加模型错误安全与判定字段测试，覆盖限流/超时可重试、认证/能力错误不可重试及敏感凭证不出现在公开数据中；验证：`pytest -q tests/exceptions -k model` 通过。
 
-## 2. 模型与事件公开契约（src/contracts, testing）
+## 2. 模型与事件公开契约（src/contracts/runtime, testing）
 
-- [ ] 2.1 [model-invocation-contracts][src/contracts] 定义模型消息/content blocks、工具声明与工具调用、能力、生成选项、带调用级 `timeout_seconds` 的 `ModelRequest`、`ModelResponse` 及 status/stop reason 合法映射；验证：`pytest -q tests/contracts -k model` 覆盖合法序列化、非法 timeout 和非法状态组合拒绝。
-- [ ] 2.2 [model-invocation-contracts][src/contracts] 定义 `ModelUsage` 阶段细分与 `ModelStreamEvent` typed payload，明确缺失 token 值不伪造为零；验证：`pytest -q tests/contracts -k "usage or stream"` 通过。
-- [ ] 2.3 [model-runtime-event-contracts][src/contracts, src/events] 定义 `RuntimeEvent` envelope、模型生命周期事件枚举及 Started/Completed/Failed/ToolCallsProduced typed payload，并提供 `src.events` 可发现导出；验证：`pytest -q tests/contracts -k event` 验证事件序列化和非法 payload 拒绝。
+- [x] 2.1 [model-invocation-contracts][src/contracts/runtime] 定义模型消息/content blocks、工具声明与工具调用、能力、生成选项、带调用级 `timeout_seconds` 的 `ModelRequest`、`ModelResponse` 及 status/stop reason 合法映射；验证：`pytest -q tests/contracts -k model` 覆盖合法序列化、非法 timeout 和非法状态组合拒绝。
+- [x] 2.2 [model-invocation-contracts][src/contracts/runtime] 定义 `ModelUsage` 阶段细分与 `ModelStreamEvent` typed payload，明确缺失 token 值不伪造为零；验证：`pytest -q tests/contracts -k "usage or stream"` 通过。
+- [ ] 2.3 [model-runtime-event-contracts][src/contracts/runtime, src/events] 定义 `RuntimeEvent` envelope、模型生命周期事件枚举及 Started/Completed/Failed/ToolCallsProduced typed payload，并提供 `src.events` 可发现导出；验证：`pytest -q tests/contracts -k event` 验证事件序列化和非法 payload 拒绝。
 - [ ] 2.4 [model-runtime-event-contracts][testing] 增加事件敏感数据边界测试，确保 model lifecycle payload 无需 raw request/response、完整 prompt 或完整工具参数即可构造；验证：`pytest -q tests/contracts -k event_security` 通过。
 
 ## 3. Adapter 基础与模型选择（src/models, src/core, testing）
