@@ -1,5 +1,13 @@
 """Agent runtime 使用的跨模块模型调用契约。"""
 
+from src.contracts.runtime.events import ModelInvocationCompletedPayload
+from src.contracts.runtime.events import ModelInvocationFailedPayload
+from src.contracts.runtime.events import ModelInvocationStartedPayload
+from src.contracts.runtime.events import ModelToolCallsProducedPayload
+from src.contracts.runtime.events import ProducedToolCallFact
+from src.contracts.runtime.events import RuntimeActorType
+from src.contracts.runtime.events import RuntimeEvent
+from src.contracts.runtime.events import RuntimeEventType
 from src.contracts.runtime.messages import CustomContentBlock
 from src.contracts.runtime.messages import ImageContentBlock
 from src.contracts.runtime.messages import ModelContentBlock
@@ -41,6 +49,9 @@ __all__ = [
     "InvocationStartedPayload",
     "ModelCapabilities",
     "ModelContentBlock",
+    "ModelInvocationCompletedPayload",
+    "ModelInvocationFailedPayload",
+    "ModelInvocationStartedPayload",
     "ModelMessage",
     "ModelOptions",
     "ModelProtocol",
@@ -56,11 +67,16 @@ __all__ = [
     "ModelToolCall",
     "ModelToolChoice",
     "ModelToolChoiceMode",
+    "ModelToolCallsProducedPayload",
     "ModelToolDeclaration",
     "ModelUsage",
+    "ProducedToolCallFact",
     "RefusalContentBlock",
     "ResponseCompletedPayload",
     "ResponseFailedPayload",
+    "RuntimeActorType",
+    "RuntimeEvent",
+    "RuntimeEventType",
     "TextContentBlock",
     "ToolCallCompletedPayload",
     "ToolCallContentBlock",

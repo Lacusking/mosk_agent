@@ -8,8 +8,8 @@
 
 - [x] 2.1 [model-invocation-contracts][src/contracts/runtime] 定义模型消息/content blocks、工具声明与工具调用、能力、生成选项、带调用级 `timeout_seconds` 的 `ModelRequest`、`ModelResponse` 及 status/stop reason 合法映射；验证：`pytest -q tests/contracts -k model` 覆盖合法序列化、非法 timeout 和非法状态组合拒绝。
 - [x] 2.2 [model-invocation-contracts][src/contracts/runtime] 定义 `ModelUsage` 阶段细分与 `ModelStreamEvent` typed payload，明确缺失 token 值不伪造为零；验证：`pytest -q tests/contracts -k "usage or stream"` 通过。
-- [ ] 2.3 [model-runtime-event-contracts][src/contracts/runtime, src/events] 定义 `RuntimeEvent` envelope、模型生命周期事件枚举及 Started/Completed/Failed/ToolCallsProduced typed payload，并提供 `src.events` 可发现导出；验证：`pytest -q tests/contracts -k event` 验证事件序列化和非法 payload 拒绝。
-- [ ] 2.4 [model-runtime-event-contracts][testing] 增加事件敏感数据边界测试，确保 model lifecycle payload 无需 raw request/response、完整 prompt 或完整工具参数即可构造；验证：`pytest -q tests/contracts -k event_security` 通过。
+- [x] 2.3 [model-runtime-event-contracts][src/contracts/runtime, src/events] 定义 `RuntimeEvent` envelope、模型生命周期事件枚举及 Started/Completed/Failed/ToolCallsProduced typed payload，并提供 `src.events` 可发现导出；验证：`pytest -q tests/contracts -k event` 验证事件序列化和非法 payload 拒绝。
+- [x] 2.4 [model-runtime-event-contracts][testing] 增加事件敏感数据边界测试，确保 model lifecycle payload 无需 raw request/response、完整 prompt 或完整工具参数即可构造；验证：`pytest -q tests/contracts -k event_security` 通过。
 
 ## 3. Adapter 基础与模型选择（src/models, src/core, testing）
 
@@ -40,4 +40,4 @@
 
 - [ ] 7.1 [openai-protocol-adapters][testing] 增加无外部网络的 adapter 集成测试，覆盖 Mock、OpenAI Chat 和 Responses 的 blocking/streaming 文本与工具流程；验证：`pytest -q tests/models tests/contracts tests/exceptions` 全通过。
 - [ ] 7.2 [model-invocation-contracts][platform-exceptions-foundation][testing] 执行质量校验并修复 typing/lint 问题，确认迁移后当前测试不回归；验证：`ruff check src tests && pytest -q`。
-- [ ] 7.3 [model-runtime-event-contracts][docs] 更新架构说明，记录正式 exceptions 入口、provider/protocol/profile 边界、OpenAI 两种协议、Anthropic reserved 状态、stream event 与 durable event 的分界；验证：文档明确列出本变更非目标（无 Event Store、无 Anthropic 调用、无 pricing/budget/retry）。
+- [x] 7.3 [model-runtime-event-contracts][docs] 更新架构说明，记录正式 exceptions 入口、provider/protocol/profile 边界、OpenAI 两种协议、Anthropic reserved 状态、stream event 与 durable event 的分界；验证：文档明确列出本变更非目标（无 Event Store、无 Anthropic 调用、无 pricing/budget/retry）。
