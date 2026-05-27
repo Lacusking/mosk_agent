@@ -17,11 +17,11 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
 
-from src.core.config import settings
-from src.core.errors import BaseError
 from src.api.response import GeneralResponseCode
 from src.api.response import StandardResponseCode
 from src.api.response import response_base
+from src.core.config import settings
+from src.exceptions import BaseError
 
 logger = logging.getLogger(__name__)
 

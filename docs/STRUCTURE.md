@@ -20,27 +20,32 @@ src/
 │       └── extension_http/       # httpx 连接池扩展
 ├── cli/                 # 命令行工具：本地运行 Agent、调试任务、回放轨迹、执行评估
 │   └── main.py          # Typer CLI 入口
-├── core/                # 公共基础组件：通用类型、枚举、异常、ID 生成、时间、JSON、Result 封装
+├── core/                # 公共基础组件：通用类型、ID、时间、配置、HTTP 与异步辅助
 │   ├── config.py        # 集中配置加载（Pydantic Settings）
 │   ├── logging.py       # 结构化日志（JSON/彩色控制台/文件）
 │   ├── context.py       # 请求上下文（request_id/trace_id）
 │   ├── types.py         # 通用类型/枚举
-│   ├── errors.py        # 结构化异常体系
 │   ├── utils.py         # 基础工具函数
 │   ├── httpx_client.py  # 异步 HTTP 客户端管理（多连接池、重试）
 │   ├── retry.py         # 指数退避重试装饰器
 │   └── async_task.py    # 异步任务队列（Worker Pool）
-├── contracts/           # 统一协议与数据契约：Message、Task、Event、Tool、Agent、Memory 等 Pydantic Schema
-│   ├── base.py          # ORM 基础模型（PkModel、TimestampedModel）
-│   └── orm_types.py     # 自定义 ORM 枚举类型
+├── exceptions/          # 平台正式结构化异常入口，包含模型调用决策错误
+├── contracts/           # 跨模块契约命名空间，按数据持久化与运行时职责分域
+│   ├── database/        # 数据库映射契约
+│   │   ├── base.py      # ORM 基础模型（PkModel、TimestampedModel）
+│   │   └── orm_types.py # 自定义 ORM 枚举类型
+│   └── runtime/         # Agent runtime 公开数据契约
+│       ├── messages.py  # 模型消息与 content blocks
+│       ├── models.py    # 模型请求、响应、usage 与实时流事件
+│       └── events.py    # 模型生命周期 durable event payload/envelope
 │
 ├── runtime/             # Agent 运行时内核：事件循环、调度器、状态机、Step Runner、Checkpoint、Replay
-├── events/              # 事件系统：Event Sourcing、Event Store、Event Bus、事件流、事件处理器
+├── events/              # 当前暴露事件契约；Event Store/Event Bus 属于后续建设
 ├── tasks/               # 任务管理：Task、TaskStep、Task Graph、DAG、状态、进度、任务仓储
 ├── sessions/            # 会话管理：Session、对话历史、上下文压缩、会话生命周期、会话状态持久化
 ├── scheduler/           # 平台级调度器：定时任务、延迟任务、周期任务、后台任务、锁、租约、队列
 │
-├── models/              # 模型适配层：OpenAI、Anthropic、Gemini、Ollama、LiteLLM、模型选择与降级
+├── models/              # 模型适配层：OpenAI Chat/Responses 与 Mock；Anthropic 仅预留协议身份
 ├── prompts/             # Prompt 引擎：模板管理、变量解析、格式化、版本管理、结构化输出、Prompt Pack
 ├── skills/              # Skill 能力引擎：将 Prompt、Tool、Workflow、Policy、Memory Scope 组合为可复用能力包
 ├── hooks/               # Hook 生命周期扩展：before/after model/tool/memory/task 等拦截器与治理注入点

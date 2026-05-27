@@ -9,8 +9,8 @@ from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
 from src.core.config import settings
-from src.core.errors import AuthenticationError
-from src.core.errors import ForbiddenError
+from src.exceptions import AuthenticationError
+from src.exceptions import ForbiddenError
 
 
 class InternalHTTPBearer(HTTPBearer):

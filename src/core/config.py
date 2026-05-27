@@ -74,6 +74,15 @@ class AppConfig(AppBaseSetting):
     CORS_ALLOW_CREDENTIALS: bool = Field(default=False)
 
 
+class ModelProviderConfig(AppBaseSetting):
+    """模型 provider 与传输默认配置。"""
+
+    OPENAI_API_KEY: str = Field(default="")
+    OPENAI_BASE_URL: str = Field(default="https://api.openai.com/v1")
+    OPENAI_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+    MOCK_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+
+
 class Config(BaseSettings):
     """聚合配置入口。"""
 
@@ -81,6 +90,7 @@ class Config(BaseSettings):
     redis: RedisConfig = RedisConfig()
     log: LogConfig = LogConfig()
     app: AppConfig = AppConfig()
+    models: ModelProviderConfig = ModelProviderConfig()
 
 
 settings = Config()

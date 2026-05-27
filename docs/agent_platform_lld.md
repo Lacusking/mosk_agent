@@ -148,7 +148,7 @@ src/agent_platform/
 
 所有跨模块 Schema 优先放在 `contracts/`，模块内部可有私有 schema，但外部交互必须使用 contracts。
 
-### 5.1 `contracts/messages.py`
+### 5.1 `contracts/runtime/messages.py`
 
 ```python
 from typing import Any, Literal
@@ -227,29 +227,42 @@ class TaskStep(BaseModel):
     updated_at: datetime
 ```
 
-### 5.4 `contracts/events.py`
+### 5.4 `contracts/runtime/events.py`
 
 ```python
-from typing import Any
-from datetime import datetime
-from pydantic import BaseModel, Field
+class RuntimeEventType(StrEnum):
+    MODEL_INVOCATION_STARTED = "model_invocation_started"
+    MODEL_INVOCATION_COMPLETED = "model_invocation_completed"
+    MODEL_INVOCATION_FAILED = "model_invocation_failed"
+    MODEL_TOOL_CALLS_PRODUCED = "model_tool_calls_produced"
 
 class RuntimeEvent(BaseModel):
     event_id: str
-    event_type: str
-    event_version: str = "1.0"
+    event_type: RuntimeEventType
+    event_version: int = 1
     task_id: str | None = None
+    step_id: str | None = None
     session_id: str | None = None
     trace_id: str
     span_id: str
     parent_span_id: str | None = None
-    actor_type: str = "system"
+    actor_type: Literal["runtime", "system", "user"]
     actor_id: str | None = None
-    payload: dict[str, Any] = Field(default_factory=dict)
+    payload: (
+        ModelInvocationStartedPayload
+        | ModelInvocationCompletedPayload
+        | ModelInvocationFailedPayload
+        | ModelToolCallsProducedPayload
+    )
     created_at: datetime
 ```
 
-### 5.5 `contracts/models.py`
+生命周期 payload 仅保存 invocation 身份、provider/model/protocol、状态、usage、
+latency、错误决策字段与工具名称等安全事实。完成事件不复制模型正文或 raw wire
+body，工具意图事件不保存完整 arguments。实时文本和工具参数增量属于
+`ModelStreamEvent`，不要求逐 delta 形成 durable `RuntimeEvent`。
+
+### 5.5 `contracts/runtime/models.py`
 
 ```python
 from typing import Any, Literal
@@ -264,12 +277,16 @@ class ModelCapabilities(BaseModel):
     reasoning: bool = False
 
 class ModelRequest(BaseModel):
+    invocation_id: str
+    provider: str | None = None
     model: str
+    protocol: Literal["openai_chat", "openai_responses", "anthropic_messages", "custom", "mock"] | None = None
     messages: list[Message]
-    temperature: float = 0.2
-    max_tokens: int | None = None
+    options: ModelOptions = Field(default_factory=ModelOptions)
     tools: list[dict[str, Any]] = Field(default_factory=list)
     response_format: dict[str, Any] | None = None
+    stream: bool = False
+    timeout_seconds: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 class ToolCall(BaseModel):
@@ -278,17 +295,24 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any]
 
 class ModelUsage(BaseModel):
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
-    estimated_cost_usd: float = 0.0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    cached_input_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
+    reasoning_tokens: int | None = None
 
 class ModelResponse(BaseModel):
-    content: str | None = None
+    invocation_id: str
+    provider: str
+    model: str
+    protocol: str
+    content: list[ModelContentBlock] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
-    finish_reason: str | None = None
-    usage: ModelUsage = Field(default_factory=ModelUsage)
-    raw: dict[str, Any] = Field(default_factory=dict)
+    status: Literal["completed", "incomplete", "refused"]
+    stop_reason: Literal["completed", "tool_use", "max_tokens", "content_filtered", "refused", "unknown"]
+    provider_stop_reason: str | None = None
+    usage: ModelUsage | None = None
 ```
 
 ### 5.6 `contracts/tools.py`
@@ -825,55 +849,62 @@ app.add_typer(a2a.app, name="a2a")
 
 ## 10. Model Adapter 设计
 
+## 10.0 当前协议与事件边界
+
+模型调用实现将 `provider`、`protocol` 与 `model profile` 分离：
+
+| 边界 | 当前职责 |
+|---|---|
+| provider | endpoint、认证与 transport 配置 |
+| protocol | wire payload、blocking/streaming 解析及错误映射 |
+| model profile | 选择 protocol 并声明工具、streaming、结构化输出等能力 |
+
+本变更覆盖 `openai_chat`、`openai_responses` 与无网络依赖的 Mock 路径。
+`anthropic_messages` 只保留 protocol identity，未实现 Anthropic 网络调用；
+未注册的 `custom` protocol 同样不可执行。
+
+`ModelStreamEvent` 用于高频实时 delta 及流归约；`RuntimeEvent` 只描述开始、
+完成、失败和工具意图等 durable lifecycle facts，并通过 `src.events` 提供发现入口。
+正式平台错误入口为 `src.exceptions`，models 错误仅公开可供 runtime 判定的安全字段。
+
+本变更明确不实现 Event Store/Event Bus/replay、Anthropic 调用、
+pricing/cost budget 或自动 retry/fallback 策略。
+
 ## 10.1 目录
 
 ```text
 models/
 ├── base.py
-├── messages.py
-├── tool_call.py
-├── usage.py
 ├── registry.py
 ├── selector.py
-└── adapters/
+├── profiles.py
+├── streaming.py
+├── protocols/
+│   ├── openai_chat.py
+│   ├── openai_responses.py
+│   ├── anthropic_messages.py  # reserved
+│   └── custom.py              # registration boundary
+└── providers/
     ├── openai.py
-    ├── mock.py
-    └── __init__.py
+    └── mock.py
 ```
 
 ## 10.2 Base Adapter
 
 ```python
 class ModelAdapter(Protocol):
-    name: str
-    capabilities: ModelCapabilities
-
     async def invoke(self, request: ModelRequest) -> ModelResponse:
+        ...
+
+    async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         ...
 ```
 
-## 10.3 OpenAI Adapter
+## 10.3 OpenAI Protocol Adapters
 
-```python
-class OpenAIModelAdapter:
-    name = "openai"
-    capabilities = ModelCapabilities(
-        tool_calling=True,
-        json_schema=True,
-        streaming=True,
-    )
-
-    def __init__(self, api_key: str, default_model: str):
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.default_model = default_model
-
-    async def invoke(self, request: ModelRequest) -> ModelResponse:
-        # 1. Convert contracts.Message -> OpenAI message dict
-        # 2. Convert tools schema
-        # 3. Call chat.completions or responses API depending implementation choice
-        # 4. Normalize response
-        ...
-```
+OpenAI provider 可按 profile 选择 `openai_chat` 或 `openai_responses`。两种
+protocol 各自转换请求和解析流事件，最终均输出统一 `ModelResponse` /
+`ModelStreamEvent`，不会向 runtime 暴露 provider wire body。
 
 ## 10.4 Mock Adapter
 
@@ -891,13 +922,17 @@ class MockModelAdapter:
 
 ## 10.5 Model Selector
 
-MVP 简单策略：
+选择规则：
 
 ```text
-1. 如果 request.metadata.model 指定，则使用指定模型。
-2. 否则使用 settings.default_model_provider。
-3. 如果环境无 OpenAI key，则 fallback mock。
+request.provider / request.model / request.protocol
+    + provider registration
+    + model profile
+    -> protocol adapter + capability validation
 ```
+
+模型能力不满足或 protocol 尚未注册时在发起 transport 前失败；models 层不执行
+隐式 provider fallback。
 
 ---
 
@@ -2361,4 +2396,3 @@ deployment 锁定版本
 ```
 
 该设计可在不依赖外部 Agent 框架的前提下，形成自研 Agent Platform 的稳定技术底座。
-
