@@ -10,6 +10,7 @@ from src.contracts.runtime.events import RuntimeEvent
 from src.contracts.runtime.events import RuntimeEventType
 from src.contracts.runtime.messages import CustomContentBlock
 from src.contracts.runtime.messages import ImageContentBlock
+from src.contracts.runtime.messages import JsonValue
 from src.contracts.runtime.messages import ModelContentBlock
 from src.contracts.runtime.messages import ModelMessage
 from src.contracts.runtime.messages import ModelRole
@@ -47,6 +48,7 @@ __all__ = [
     "CustomContentBlock",
     "ImageContentBlock",
     "InvocationStartedPayload",
+    "JsonValue",
     "ModelCapabilities",
     "ModelContentBlock",
     "ModelInvocationCompletedPayload",
