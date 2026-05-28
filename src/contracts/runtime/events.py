@@ -149,7 +149,7 @@ class RuntimeEvent(_EventSchema):
     event_id: str = Field(min_length=1)
     event_type: RuntimeEventType
     event_version: int = Field(default=1, ge=1)
-    task_id: str | None = None
+    agent_run_id: str | None = None
     step_id: str | None = None
     session_id: str | None = None
     trace_id: str = Field(min_length=1)

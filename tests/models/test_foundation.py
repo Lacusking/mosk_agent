@@ -76,12 +76,21 @@ def test_selector_context_filters_sensitive_metadata_and_uses_request_timeout() 
         request(
             protocol=ModelProtocol.OPENAI_CHAT,
             timeout_seconds=2.5,
-            metadata={"trace_id": "trace-1", "prompt": "private", "api_key": "sk-secret"},
+            metadata={
+                "trace_id": "trace-1",
+                "agent_run_id": "agent-run-1",
+                "task_id": "legacy-task-1",
+                "prompt": "private",
+                "api_key": "sk-secret",
+            },
         )
     )
 
     assert selected.context.effective_timeout_seconds == 2.5
-    assert selected.context.safe_metadata == {"trace_id": "trace-1"}
+    assert selected.context.safe_metadata == {
+        "trace_id": "trace-1",
+        "agent_run_id": "agent-run-1",
+    }
     assert "secret" not in str(selected.context)
     assert "private" not in str(selected.context)
 
