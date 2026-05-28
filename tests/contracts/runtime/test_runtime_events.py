@@ -29,7 +29,7 @@ def _event(
     values: dict[str, object] = {
         "event_id": "event-1",
         "event_type": event_type,
-        "task_id": "task-1",
+        "agent_run_id": "agent-run-1",
         "step_id": "step-1",
         "session_id": "session-1",
         "trace_id": "trace-1",
@@ -59,6 +59,7 @@ class TestRuntimeEvent:
 
         assert serialized["event_type"] == "model_invocation_started"
         assert serialized["event_version"] == 1
+        assert serialized["agent_run_id"] == "agent-run-1"
         assert serialized["trace_id"] == "trace-1"
         assert serialized["payload"]["profile"] == "gpt-test-responses"
         assert DiscoverableRuntimeEvent is RuntimeEvent
