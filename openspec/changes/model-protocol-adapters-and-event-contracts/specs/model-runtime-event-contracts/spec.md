@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: 系统必须定义统一 RuntimeEvent envelope
-系统 MUST 在 `src.contracts` 中定义可供后续 runtime 与事件基础设施消费的 `RuntimeEvent` envelope，包含事件身份、版本、任务/step 关联、trace/span 关联、actor、发生时间及类型化 payload。
+系统 MUST 在 `src.contracts` 中定义可供后续 runtime 与事件基础设施消费的 `RuntimeEvent` envelope，包含事件身份、版本、`agent_run_id`/step 关联、trace/span 关联、actor、发生时间及类型化 payload。
 
 #### Scenario: 模型生命周期事件可被序列化
-- **GIVEN** 一次模型调用拥有 invocation、task 与 trace 上下文
+- **GIVEN** 一次模型调用拥有 invocation、agent run 与 trace 上下文
 - **WHEN** 调用方构造模型相关 `RuntimeEvent`
 - **THEN** event MUST 包含事件类型、版本、关联标识、trace/span 和 created-at 信息
 - **THEN** payload MUST 符合所选模型事件类型的公开 schema

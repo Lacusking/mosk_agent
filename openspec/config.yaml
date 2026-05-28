@@ -66,13 +66,13 @@ rules:
 
   proposal:
     - 必须包含章节：Why、What、Impact、Non-goals
-    - proposal 长度不超过 500 字
+    - proposal 应保持精炼；为明确边界、假设、兼容性和迁移风险时允许适度超过 500 字
     - 避免实现细节，重点说明能力变化与边界变化
     - 必须列出关键假设、歧义取舍与最小改动理由
     - 必须标注受影响模块（src/<模块名>/testing/database/devops/docs）
     - 必须说明 API 兼容性影响、配置变更风险、数据迁移风险
 
-  spec:
+  specs:
     - 每个spec需要使用中文编写
     - 每个 Requirement 必须使用 Gherkin 场景（Given / When / Then）
     - Requirement 描述系统行为，不描述框架实现

@@ -10,6 +10,7 @@
 - [x] 2.2 [model-invocation-contracts][src/contracts/runtime] 定义 `ModelUsage` 阶段细分与 `ModelStreamEvent` typed payload，明确缺失 token 值不伪造为零；验证：`pytest -q tests/contracts -k "usage or stream"` 通过。
 - [x] 2.3 [model-runtime-event-contracts][src/contracts/runtime, src/events] 定义 `RuntimeEvent` envelope、模型生命周期事件枚举及 Started/Completed/Failed/ToolCallsProduced typed payload，并提供 `src.events` 可发现导出；验证：`pytest -q tests/contracts -k event` 验证事件序列化和非法 payload 拒绝。
 - [x] 2.4 [model-runtime-event-contracts][testing] 增加事件敏感数据边界测试，确保 model lifecycle payload 无需 raw request/response、完整 prompt 或完整工具参数即可构造；验证：`pytest -q tests/contracts -k event_security` 通过。
+- [ ] 2.5 [model-runtime-event-contracts][src/contracts/runtime, src/models, testing] 按 runtime 执行单元澄清决策，将 `RuntimeEvent` 与安全 model metadata 的执行关联字段由 `task_id` 修订为 `agent_run_id`；验证：`rg "task_id" src/contracts/runtime src/models/selector.py tests/contracts/runtime` 不存在旧执行关联字段，且 `pytest -q tests/contracts tests/models` 通过。
 
 ## 3. Adapter 基础与模型选择（src/models, src/core, testing）
 
