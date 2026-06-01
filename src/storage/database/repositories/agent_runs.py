@@ -17,9 +17,11 @@ from src.contracts.agent_runs import AgentRunStep
 from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
 from src.core.utils import generate_uuid7
-from src.core.utils import utc_now
 from src.storage.database.models.agent_runs import AgentRunRecord
 from src.storage.database.models.agent_runs import AgentRunStepRecord
+from src.storage.database.time import aware_utc_from_db
+from src.storage.database.time import naive_utc_for_db
+from src.storage.database.time import naive_utc_now
 
 ACTIVE_RUN_STATUSES = frozenset({AgentRunStatus.CREATED.value, AgentRunStatus.RUNNING.value})
 TERMINAL_RUN_STATUSES = frozenset(
@@ -92,10 +94,10 @@ def _record_to_run(record: AgentRunRecord) -> AgentRun:
         max_steps=record.max_steps,
         timeout_seconds=record.timeout_seconds,
         retry_limit=record.retry_limit,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
-        started_at=record.started_at,
-        completed_at=record.completed_at,
+        created_at=aware_utc_from_db(record.created_at),
+        updated_at=aware_utc_from_db(record.updated_at),
+        started_at=aware_utc_from_db(record.started_at),
+        completed_at=aware_utc_from_db(record.completed_at),
     )
 
 
@@ -111,9 +113,9 @@ def _record_to_step(record: AgentRunStepRecord) -> AgentRunStep:
         safe_input=record.safe_input,
         safe_output=record.safe_output,
         error_type=record.error_type,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
-        completed_at=record.completed_at,
+        created_at=aware_utc_from_db(record.created_at),
+        updated_at=aware_utc_from_db(record.updated_at),
+        completed_at=aware_utc_from_db(record.completed_at),
     )
 
 
@@ -178,7 +180,7 @@ class AgentRunRepository:
             max_steps=max_steps,
             timeout_seconds=timeout_seconds,
             retry_limit=retry_limit,
-            started_at=started_at,
+            started_at=naive_utc_for_db(started_at),
         )
         self._db.add(record)
         await self._db.flush()
@@ -245,7 +247,7 @@ class AgentRunRepository:
         _ensure_run_transition(AgentRunStatus(record.status), status)
         record.status = status.value
         if status == AgentRunStatus.RUNNING and record.started_at is None:
-            record.started_at = utc_now().replace(tzinfo=None)
+            record.started_at = naive_utc_now()
         if status in {
             AgentRunStatus.COMPLETED,
             AgentRunStatus.FAILED,
@@ -253,7 +255,7 @@ class AgentRunRepository:
         }:
             record.finish_reason = finish_reason.value if finish_reason else None
             record.error_type = error_type
-            record.completed_at = completed_at or utc_now().replace(tzinfo=None)
+            record.completed_at = naive_utc_for_db(completed_at) or naive_utc_now()
         await self._db.flush()
         await self._db.refresh(record)
         return _record_to_run(record)
@@ -329,7 +331,7 @@ class AgentRunRepository:
         record.status = status.value
         record.safe_output = safe_output or {}
         record.error_type = error_type
-        record.completed_at = utc_now().replace(tzinfo=None)
+        record.completed_at = naive_utc_now()
         await self._db.flush()
         await self._db.refresh(record)
         return _record_to_step(record)

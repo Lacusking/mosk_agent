@@ -14,6 +14,7 @@ from src.contracts.runtime import RuntimeEvent
 from src.contracts.runtime import RuntimeEventPayload
 from src.contracts.runtime import RuntimeEventType
 from src.storage.database.models.events import RuntimeEventRecord
+from src.storage.database.time import aware_utc_from_db
 
 
 def _uuid(value: str | UUID) -> UUID:
@@ -39,7 +40,7 @@ def _record_to_event(record: RuntimeEventRecord) -> RuntimeEvent:
             "actor_type": record.actor_type,
             "actor_id": record.actor_id,
             "payload": record.payload,
-            "created_at": record.created_at,
+            "created_at": aware_utc_from_db(record.created_at),
         }
     )
 

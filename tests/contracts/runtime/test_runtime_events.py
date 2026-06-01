@@ -19,6 +19,7 @@ from src.contracts.runtime import RuntimeActorType
 from src.contracts.runtime import RuntimeEvent
 from src.contracts.runtime import RuntimeEventType
 from src.events import RuntimeEvent as DiscoverableRuntimeEvent
+from src.storage.database.time import aware_utc_from_db
 
 
 def _event(
@@ -112,6 +113,12 @@ class TestRuntimeEvent:
                     ),
                 }
             )
+
+    def test_repository_boundary_restores_utc_timezone(self) -> None:
+        value = aware_utc_from_db(datetime(2026, 5, 26, 12))
+
+        assert value is not None
+        assert value.tzinfo is UTC
 
 
 class TestModelLifecyclePayloads:
