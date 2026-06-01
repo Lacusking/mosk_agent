@@ -12,7 +12,7 @@ from src.exceptions import NotFoundError
 from src.sessions.messages import assistant_text_content
 from src.sessions.messages import to_model_messages
 from src.sessions.messages import user_text_content
-from src.storage.database.repositories import SessionRepository
+from src.storage.database.repositories.sessions import SessionRepository
 
 
 class SessionManager:
