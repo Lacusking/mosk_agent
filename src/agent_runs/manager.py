@@ -10,7 +10,6 @@ from src.contracts.agent_runs import AgentRunStep
 from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
 from src.core.config import AgentRuntimeConfig
-from src.core.utils import utc_now
 from src.exceptions import AgentRunConflictError
 from src.storage.database.repositories.agent_runs import AgentRunRepository
 
@@ -181,7 +180,6 @@ class AgentRunManager:
             agent_run_id=agent_run_id,
             status=AgentRunStatus.COMPLETED,
             finish_reason=finish_reason,
-            completed_at=utc_now().replace(tzinfo=None),
         )
 
     async def fail_run(self, agent_run_id: str, *, error_type: str) -> AgentRun | None:
@@ -199,7 +197,6 @@ class AgentRunManager:
             status=AgentRunStatus.FAILED,
             finish_reason=AgentRunFinishReason.ERROR,
             error_type=error_type,
-            completed_at=utc_now().replace(tzinfo=None),
         )
 
     async def cancel_run(self, agent_run_id: str) -> AgentRun | None:
@@ -215,7 +212,6 @@ class AgentRunManager:
             agent_run_id=agent_run_id,
             status=AgentRunStatus.CANCELLED,
             finish_reason=AgentRunFinishReason.CANCELLED,
-            completed_at=utc_now().replace(tzinfo=None),
         )
 
     async def set_active_pattern(

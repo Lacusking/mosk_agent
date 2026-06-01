@@ -17,6 +17,7 @@ from src.contracts.sessions import SessionStatus
 from src.core.utils import generate_uuid7
 from src.storage.database.models.sessions import SessionMessageRecord
 from src.storage.database.models.sessions import SessionRecord
+from src.storage.database.time import aware_utc_from_db
 
 _CONTENT_ADAPTER: TypeAdapter[list[ModelContentBlock]] = TypeAdapter(list[ModelContentBlock])
 
@@ -40,8 +41,8 @@ def _record_to_session(record: SessionRecord) -> Session:
         title=record.title,
         metadata=record.metadata_,
         last_message_sequence=record.last_message_sequence,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
+        created_at=aware_utc_from_db(record.created_at),
+        updated_at=aware_utc_from_db(record.updated_at),
     )
 
 
@@ -54,8 +55,8 @@ def _record_to_message(record: SessionMessageRecord) -> SessionMessage:
         role=SessionMessageRole(record.role),
         content=_CONTENT_ADAPTER.validate_python(record.content),
         metadata=record.metadata_,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
+        created_at=aware_utc_from_db(record.created_at),
+        updated_at=aware_utc_from_db(record.updated_at),
     )
 
 

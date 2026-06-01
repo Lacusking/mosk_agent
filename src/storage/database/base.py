@@ -4,7 +4,6 @@
 提供 ORM 基础模型，统一 UUID 主键、时间字段与序列化行为。
 """
 
-from datetime import UTC
 from datetime import datetime
 from enum import IntEnum
 from enum import StrEnum
@@ -28,12 +27,14 @@ from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.types import UUID
 from sqlalchemy.types import VARCHAR
 
+from src.core.utils import camel_to_snake
 from src.storage.database.orm_types import OrmIntEnum
 from src.storage.database.orm_types import OrmStringEnum
-from src.core.utils import camel_to_snake
+from src.storage.database.time import naive_utc_now
 
 OrmTextType = TypeVar("OrmTextType", bound=str)
 JsonbType = TypeVar("JsonbType", dict, list)
+
 
 metadata = MetaData(
     naming_convention={
@@ -100,7 +101,7 @@ class TimestampedModel(BaseModel):
     )
     updated_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=False),
-        onupdate=lambda: datetime.now(UTC).replace(microsecond=0, tzinfo=UTC),
+        onupdate=naive_utc_now,
         nullable=False,
         index=True,
         server_default=text("timezone('UTC', now())"),
