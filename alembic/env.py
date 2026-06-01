@@ -15,10 +15,13 @@ from alembic import context
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.contracts.base import BaseModel  # noqa: E402
-from src.contracts.orm_types import OrmIntEnum  # noqa: E402, F401
-from src.contracts.orm_types import OrmStringEnum  # noqa: E402, F401
 from src.core.config import settings  # noqa: E402
+from src.storage.database import BaseModel  # noqa: E402
+from src.storage.database import OrmIntEnum  # noqa: E402, F401
+from src.storage.database import OrmStringEnum  # noqa: E402, F401
+from src.storage.database.models import agent_runs as agent_run_models  # noqa: E402, F401
+from src.storage.database.models import events as event_models  # noqa: E402, F401
+from src.storage.database.models import sessions as session_models  # noqa: E402, F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.db.database_url)

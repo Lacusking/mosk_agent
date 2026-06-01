@@ -86,6 +86,7 @@ MVP 方案应遵循以下分层：
 - 公共契约层：`core, contracts`
 
 跨模块数据交互必须通过 `contracts/` 中的 schema 协议，不允许隐式结构。
+数据库基础设施统一归口到 `src/storage/database/`：ORM base/types、ORM records、repositories、SQLAlchemy session 均放在该路径下；领域目录（如 `sessions`、`agent_runs`、`events`）只保留业务 manager、领域服务或公开导出，不新增并行 repository/model 文件。
 
 ## 8. 开发级别约束（P0/P1/P2）
 
@@ -96,9 +97,9 @@ MVP 方案应遵循以下分层：
 - `api`：FastAPI 核心会话与 AgentRun 接口
 - `cli`：Typer 本地运行与调试入口
 - `runtime`：AgentRun 状态机、事件循环、step runner
-- `events`：Event Sourcing、Event Store
-- `agent_runs`：AgentRun/AgentRunStep 与状态持久化
-- `sessions`：会话历史与 summary compaction
+- `events`：事件契约与事件服务入口；持久化 repository 位于 `src/storage/database/repositories`
+- `agent_runs`：AgentRun/AgentRunStep 业务状态管理；ORM/repository 位于 `src/storage/database`
+- `sessions`：会话历史业务管理与 summary compaction；ORM/repository 位于 `src/storage/database`
 - `models`：OpenAI + Mock Adapter
 - `prompts`：模板加载、渲染、格式化、版本基础能力
 - `skills`：Manifest/Registry/Loader/Resolver
@@ -114,7 +115,7 @@ MVP 方案应遵循以下分层：
 - `governance`：audit、risk guard、approval stub
 - `observability`：trace_id、日志、token/cost 基础统计
 - `deployment`：Prompt/Skill/Policy version binding
-- `storage`：SQLite/PostgreSQL repository
+- `storage`：SQLite/PostgreSQL/Redis 基础设施；数据库相关代码集中在 `src/storage/database`
 
 ### 8.2 P1（增强能力，非阻塞）
 

@@ -83,7 +83,7 @@ def register_exception(app: FastAPI) -> None:
             request.url.path, exc.code, exc.msg,
         )
         return JSONResponse(
-            status_code=StandardResponseCode.HTTP_400,
+            status_code=exc.http_status,
             content=exc.to_dict(),
         )
 

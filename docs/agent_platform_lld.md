@@ -41,6 +41,7 @@
 | Eval | 第一版先不做 Eval 阻塞项，仅保留扩展接口 |
 | Runtime 执行单元 | `AgentRun`，公开关联键为 `agent_run_id` |
 | Task 语义 | 保留为后续 planning/todo/reminder/markdown plan 引擎，不承担 AgentRun 生命周期 |
+| 数据库代码归口 | ORM base/types、ORM records、repositories、SQLAlchemy session 统一放在 `src/storage/database/` |
 
 **术语优先规则：** 本文历史版本曾使用 `Task` 表示 runtime 执行单元。从本决策起，运行状态机、事件关联、模型/工具调用来源、API 执行资源和 replay 上下文均以 `AgentRun` / `agent_run_id` 表达；仅规划待办领域使用 `Task`。未在本轮展开的远期章节若仍出现旧执行含义的 `task`，应按本规则解释并在对应能力落地前修订。
 
@@ -112,10 +113,10 @@ src/agent_platform/
 ├── core/                # P0：公共工具、异常、ID、时间、Result
 ├── contracts/           # P0：跨模块 Pydantic Schema
 ├── runtime/             # P0：运行时内核、事件循环、状态机、Step Runner
-├── events/              # P0：Event Sourcing、Event Store、Event Bus
-├── agent_runs/          # P0：AgentRun、AgentRunStep、状态、Repository
+├── events/              # P0：Event Sourcing、Event Store、Event Bus 入口
+├── agent_runs/          # P0：AgentRun、AgentRunStep 业务状态管理
 ├── tasks/               # P1：规划待办引擎预留，不属于当前 runtime 交付
-├── sessions/            # P0：Session、history、summary compaction
+├── sessions/            # P0：Session、history、summary compaction 业务管理
 ├── scheduler/           # P1：后台调度，MVP 仅保留接口
 ├── models/              # P0：OpenAI + Mock Adapter
 ├── prompts/             # P0：Prompt Registry、Renderer、Formatter、Versioning
@@ -142,7 +143,7 @@ src/agent_platform/
 ├── notifications/       # P1：Webhook notification stub
 ├── control_plane/       # P1：Prompt/Skill/Policy 管理 API 基础版
 ├── deployment/          # P0：Prompt/Skill/Policy version binding
-├── storage/             # P0：SQLite/PostgreSQL Repository，Redis 可选
+├── storage/             # P0：SQLite/PostgreSQL Repository、ORM Model、DB session；Redis 可选
 ├── workers/             # P1：asyncio worker 基础版
 └── plugins/             # P1：插件 manifest 与本地 loader
 ```
@@ -2303,8 +2304,8 @@ tests/integration/
 
 ### Sprint 2：Runtime + Events
 
-1. AgentRun repository。
-2. Event store。
+1. AgentRun repository（放在 `src/storage/database/repositories`）。
+2. Event store（repository/model 放在 `src/storage/database`）。
 3. Runtime state machine。
 4. Runtime loop with mock model。
 5. AgentRun API。

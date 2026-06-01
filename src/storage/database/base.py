@@ -28,8 +28,8 @@ from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.types import UUID
 from sqlalchemy.types import VARCHAR
 
-from src.contracts.database.orm_types import OrmIntEnum
-from src.contracts.database.orm_types import OrmStringEnum
+from src.storage.database.orm_types import OrmIntEnum
+from src.storage.database.orm_types import OrmStringEnum
 from src.core.utils import camel_to_snake
 
 OrmTextType = TypeVar("OrmTextType", bound=str)

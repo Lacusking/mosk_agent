@@ -26,7 +26,7 @@
 
 ## Impact
 
-- 受影响模块：`src/contracts`、`src/sessions`、`src/agent_runs`、`src/runtime`、`src/patterns`、`src/tools`、`src/events`、`src/api`、`tests`、`database`、`docs`。
+- 受影响模块：`src/contracts`、`src/sessions`、`src/agent_runs`、`src/runtime`、`src/patterns`、`src/tools`、`src/events`、`src/storage/database`、`src/api`、`tests`、`database`、`docs`。
 - API 兼容性：新增 `/api/v1/sessions` 与 `/api/v1/agent-runs` 路由及 SSE envelope；`task_id -> agent_run_id` 为执行事件契约的非兼容命名修订。当前尚无稳定公开 AgentRun API，因此在首轮落地前完成修订成本最低。
 - 配置风险：新增默认 mode/pattern、最大 step、timeout、模型重试额度和仅供 dev/test 的 mock tool 开关；错误开启 mock 工具会造成能力暴露误解，生产配置必须默认关闭或拒绝 ReAct 工具动作。
 - 数据迁移风险：新增 `sessions`、`session_messages`、`agent_runs`、`agent_run_steps`、`runtime_events` 五表及活动 run 唯一约束；需要 Alembic upgrade/downgrade 验证，不迁移既有 Task 数据。

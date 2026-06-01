@@ -1,8 +1,4 @@
-"""
-自定义 ORM 类型
-
-提供枚举类型到数据库类型的映射。
-"""
+"""自定义 ORM 类型。"""
 
 import logging
 from enum import Enum

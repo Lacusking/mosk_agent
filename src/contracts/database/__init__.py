@@ -1,10 +1,13 @@
-"""数据库持久化所需的 ORM 契约。"""
+"""数据库 ORM 基础契约兼容入口。
 
-from src.contracts.database.base import BaseModel
-from src.contracts.database.base import PkModel
-from src.contracts.database.base import TimestampedModel
-from src.contracts.database.orm_types import OrmIntEnum
-from src.contracts.database.orm_types import OrmStringEnum
+实际数据库基础设施集中位于 ``src.storage.database``。
+"""
+
+from src.storage.database import BaseModel
+from src.storage.database import OrmIntEnum
+from src.storage.database import OrmStringEnum
+from src.storage.database import PkModel
+from src.storage.database import TimestampedModel
 
 __all__ = [
     "BaseModel",

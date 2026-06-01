@@ -8,6 +8,7 @@ class ValidationError(BaseError):
 
     code = 40000
     default_msg = "参数校验失败"
+    http_status = 422
 
 
 class NotFoundError(BaseError):
@@ -15,6 +16,7 @@ class NotFoundError(BaseError):
 
     code = 40400
     default_msg = "资源不存在"
+    http_status = 404
 
 
 class AuthenticationError(BaseError):
@@ -22,6 +24,7 @@ class AuthenticationError(BaseError):
 
     code = 40100
     default_msg = "认证失败"
+    http_status = 401
 
 
 class ForbiddenError(BaseError):
@@ -29,6 +32,15 @@ class ForbiddenError(BaseError):
 
     code = 40300
     default_msg = "禁止访问"
+    http_status = 403
+
+
+class AgentRunConflictError(BaseError):
+    """AgentRun 资源冲突异常。"""
+
+    code = 40901
+    default_msg = "AgentRun 冲突"
+    http_status = 409
 
 
 class ConfigurationError(BaseError):

@@ -1,13 +1,23 @@
 """Agent runtime 使用的跨模块模型调用契约。"""
 
+from src.contracts.runtime.events import AgentRunCancelledPayload
+from src.contracts.runtime.events import AgentRunCompletedPayload
+from src.contracts.runtime.events import AgentRunFailedPayload
+from src.contracts.runtime.events import AgentRunStartedPayload
 from src.contracts.runtime.events import ModelInvocationCompletedPayload
 from src.contracts.runtime.events import ModelInvocationFailedPayload
 from src.contracts.runtime.events import ModelInvocationStartedPayload
 from src.contracts.runtime.events import ModelToolCallsProducedPayload
+from src.contracts.runtime.events import PatternSelectedPayload
+from src.contracts.runtime.events import PatternTransitionedPayload
 from src.contracts.runtime.events import ProducedToolCallFact
 from src.contracts.runtime.events import RuntimeActorType
 from src.contracts.runtime.events import RuntimeEvent
+from src.contracts.runtime.events import RuntimeEventPayload
 from src.contracts.runtime.events import RuntimeEventType
+from src.contracts.runtime.events import StepCompletedPayload
+from src.contracts.runtime.events import StepStartedPayload
+from src.contracts.runtime.events import ToolActionExecutedPayload
 from src.contracts.runtime.messages import CustomContentBlock
 from src.contracts.runtime.messages import ImageContentBlock
 from src.contracts.runtime.messages import JsonValue
@@ -45,6 +55,10 @@ from src.contracts.runtime.models import UsageUpdatedPayload
 
 __all__ = [
     "ContentDeltaPayload",
+    "AgentRunCancelledPayload",
+    "AgentRunCompletedPayload",
+    "AgentRunFailedPayload",
+    "AgentRunStartedPayload",
     "CustomContentBlock",
     "ImageContentBlock",
     "InvocationStartedPayload",
@@ -72,18 +86,24 @@ __all__ = [
     "ModelToolCallsProducedPayload",
     "ModelToolDeclaration",
     "ModelUsage",
+    "PatternSelectedPayload",
+    "PatternTransitionedPayload",
     "ProducedToolCallFact",
     "RefusalContentBlock",
     "ResponseCompletedPayload",
     "ResponseFailedPayload",
     "RuntimeActorType",
     "RuntimeEvent",
+    "RuntimeEventPayload",
     "RuntimeEventType",
+    "StepCompletedPayload",
+    "StepStartedPayload",
     "TextContentBlock",
     "ToolCallCompletedPayload",
     "ToolCallContentBlock",
     "ToolCallDeltaPayload",
     "ToolCallStartedPayload",
     "ToolResultContentBlock",
+    "ToolActionExecutedPayload",
     "UsageUpdatedPayload",
 ]
