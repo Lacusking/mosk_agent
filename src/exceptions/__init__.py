@@ -1,6 +1,7 @@
 """平台统一异常入口。"""
 
 from src.exceptions.base import BaseError
+from src.exceptions.common import AgentRunConflictError
 from src.exceptions.common import AuthenticationError
 from src.exceptions.common import ConfigurationError
 from src.exceptions.common import ForbiddenError
@@ -21,6 +22,7 @@ from src.exceptions.models import ModelUnavailableError
 from src.exceptions.storage import StorageError
 
 __all__ = [
+    "AgentRunConflictError",
     "AuthenticationError",
     "BaseError",
     "ConfigurationError",

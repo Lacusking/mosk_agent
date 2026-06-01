@@ -16,7 +16,9 @@ from src.models.registry import ProfileRegistry
 from src.models.registry import ProtocolRegistry
 from src.models.registry import ProviderRegistry
 
-_SAFE_METADATA_KEYS = frozenset({"request_id", "trace_id", "task_id", "step_id", "mode"})
+_SAFE_METADATA_KEYS = frozenset(
+    {"request_id", "trace_id", "agent_run_id", "step_id", "mode"}
+)
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,7 @@ from src.contracts.runtime import RuntimeActorType
 from src.contracts.runtime import RuntimeEvent
 from src.contracts.runtime import RuntimeEventType
 from src.events import RuntimeEvent as DiscoverableRuntimeEvent
+from src.storage.database.time import aware_utc_from_db
 
 
 def _event(
@@ -29,7 +30,7 @@ def _event(
     values: dict[str, object] = {
         "event_id": "event-1",
         "event_type": event_type,
-        "task_id": "task-1",
+        "agent_run_id": "agent-run-1",
         "step_id": "step-1",
         "session_id": "session-1",
         "trace_id": "trace-1",
@@ -59,6 +60,7 @@ class TestRuntimeEvent:
 
         assert serialized["event_type"] == "model_invocation_started"
         assert serialized["event_version"] == 1
+        assert serialized["agent_run_id"] == "agent-run-1"
         assert serialized["trace_id"] == "trace-1"
         assert serialized["payload"]["profile"] == "gpt-test-responses"
         assert DiscoverableRuntimeEvent is RuntimeEvent
@@ -111,6 +113,12 @@ class TestRuntimeEvent:
                     ),
                 }
             )
+
+    def test_repository_boundary_restores_utc_timezone(self) -> None:
+        value = aware_utc_from_db(datetime(2026, 5, 26, 12))
+
+        assert value is not None
+        assert value.tzinfo is UTC
 
 
 class TestModelLifecyclePayloads:

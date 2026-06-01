@@ -117,6 +117,8 @@ exceptions/
 
 当前 API exception handler、鉴权依赖、`src/core/__init__.py` 与相关测试都迁移为引用 `src.exceptions`。按已确认决策，不保留 `src.core.errors` 的兼容导出层。
 
+`BaseError` 增加 `http_status: int` 属性（默认 400），子类按语义覆盖。API exception handler 根据 `exc.http_status` 设置 HTTP 状态码，取代当前对所有 `BaseError` 硬编码 HTTP 400 的行为。现有公共异常的映射：`AuthenticationError -> 401`、`ForbiddenError -> 403`、`NotFoundError -> 404`、`ValidationError -> 422`。后续变更可在此基础上增加业务异常（如 `AgentRunConflictError -> 409`）。
+
 模型公开错误分类如下：
 
 | 错误类型 | `retryable` | 后续 runtime 的典型判断 |
@@ -384,7 +386,7 @@ HTTP blocking 请求或整个 stream 读取边界
 
 - `timeout_seconds` 可为空；提供时必须为正数。
 - request 级 timeout 优先于 provider/transport 默认 timeout。
-- 后续 runtime 若有 task deadline 或 policy 上限，可以在创建 `ModelRequest` 前限制请求 timeout；本变更不实现该 runtime 策略。
+- 后续 runtime 若有 agent run deadline 或 policy 上限，可以在创建 `ModelRequest` 前限制请求 timeout；本变更不实现该 runtime 策略。
 - 超时不发送为 OpenAI 请求 body 的生成参数，而是在 transport 执行边界生效。
 - blocking 或 streaming 达到有效超时后，models 抛出 `ModelTimeoutError`，包含已解析的 invocation identity；stream 若已有增量输出，可用 `ModelStreamInterruptedError` 表达部分输出状态并将根因为 timeout 纳入安全诊断字段。
 
@@ -512,7 +514,7 @@ RuntimeEvent[Payload]
   event_id
   event_type
   event_version
-  task_id?
+  agent_run_id?
   step_id?
   session_id?
   trace_id
@@ -591,7 +593,7 @@ provider registration 只拥有 endpoint、auth 与 provider 配置；model prof
 
 `timeout_seconds` 由单次 `ModelRequest` 可选指定，未指定时使用 provider/transport 默认值；它不属于改变模型生成行为的 `ModelOptions`。
 
-选择原因：不同 task 或 step 可能需要不同调用时限，且 `ModelTimeoutError` 必须能与具体 invocation 对应；同时不应把 transport 控制参数混入 provider generation options。
+选择原因：不同 agent run 或 step 可能需要不同调用时限，且 `ModelTimeoutError` 必须能与具体 invocation 对应；同时不应把 transport 控制参数混入 provider generation options。
 
 备选方案：仅使用全局/transport timeout。未采用，因为无法让调用方为单次 agent step 施加明确上限。
 
@@ -617,7 +619,7 @@ streaming 路径先输出类型化 delta events，再由 reducer 组合为最终
 
 adapter 报告一次调用的 usage，并通过 `ModelError` 提供 `retryable` 等决策字段；预算、成本和重试执行由后续 runtime/observability 能力承担。
 
-选择原因：这些行为需要 task 级上下文、幂等策略及事件持久化，而当前变更只建立调用边界。
+选择原因：这些行为需要 agent run 级上下文、幂等策略及事件持久化，而当前变更只建立调用边界。
 
 ## 错误处理策略
 

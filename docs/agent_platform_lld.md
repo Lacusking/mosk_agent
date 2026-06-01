@@ -39,6 +39,11 @@
 | 租户模式 | 单租户平台，暂不做多租户隔离 |
 | Deployment | Prompt、Skill、Policy 版本发布纳入第一版 |
 | Eval | 第一版先不做 Eval 阻塞项，仅保留扩展接口 |
+| Runtime 执行单元 | `AgentRun`，公开关联键为 `agent_run_id` |
+| Task 语义 | 保留为后续 planning/todo/reminder/markdown plan 引擎，不承担 AgentRun 生命周期 |
+| 数据库代码归口 | ORM base/types、ORM records、repositories、SQLAlchemy session 统一放在 `src/storage/database/` |
+
+**术语优先规则：** 本文历史版本曾使用 `Task` 表示 runtime 执行单元。从本决策起，运行状态机、事件关联、模型/工具调用来源、API 执行资源和 replay 上下文均以 `AgentRun` / `agent_run_id` 表达；仅规划待办领域使用 `Task`。未在本轮展开的远期章节若仍出现旧执行含义的 `task`，应按本规则解释并在对应能力落地前修订。
 
 ---
 
@@ -70,7 +75,7 @@ Storage / Events / Observability / Deployment
 User Request
 → Access Normalize
 → Identity Resolve
-→ Runtime Create Task
+→ Runtime Create AgentRun
 → Skill Resolve
 → Context Assemble
 → Prompt Render
@@ -108,15 +113,16 @@ src/agent_platform/
 ├── core/                # P0：公共工具、异常、ID、时间、Result
 ├── contracts/           # P0：跨模块 Pydantic Schema
 ├── runtime/             # P0：运行时内核、事件循环、状态机、Step Runner
-├── events/              # P0：Event Sourcing、Event Store、Event Bus
-├── tasks/               # P0：Task、TaskStep、状态、Repository
-├── sessions/            # P0：Session、history、summary compaction
+├── events/              # P0：Event Sourcing、Event Store、Event Bus 入口
+├── agent_runs/          # P0：AgentRun、AgentRunStep 业务状态管理
+├── tasks/               # P1：规划待办引擎预留，不属于当前 runtime 交付
+├── sessions/            # P0：Session、history、summary compaction 业务管理
 ├── scheduler/           # P1：后台调度，MVP 仅保留接口
 ├── models/              # P0：OpenAI + Mock Adapter
 ├── prompts/             # P0：Prompt Registry、Renderer、Formatter、Versioning
 ├── skills/              # P0：Skill Manifest、Registry、Loader、Resolver
 ├── hooks/               # P0：Hook Manager、内置治理 hooks
-├── patterns/            # P0：chaining、routing、planning 基础版
+├── patterns/            # P0：single_turn、chaining、routing、planning、react、reflection 与 selector
 ├── workflow/            # P1：linear / DAG workflow runner 基础版
 ├── agents/              # P0：BaseAgent、GeneralAgent、SupervisorAgent 基础版
 ├── multi_agent/         # P1：Subagent、A2A 基础支持
@@ -137,7 +143,7 @@ src/agent_platform/
 ├── notifications/       # P1：Webhook notification stub
 ├── control_plane/       # P1：Prompt/Skill/Policy 管理 API 基础版
 ├── deployment/          # P0：Prompt/Skill/Policy version binding
-├── storage/             # P0：SQLite/PostgreSQL Repository，Redis 可选
+├── storage/             # P0：SQLite/PostgreSQL Repository、ORM Model、DB session；Redis 可选
 ├── workers/             # P1：asyncio worker 基础版
 └── plugins/             # P1：插件 manifest 与本地 loader
 ```
@@ -185,28 +191,32 @@ class AgentRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 ```
 
-### 5.3 `contracts/tasks.py`
+### 5.3 `contracts/agent_runs.py`
 
 ```python
 from typing import Any, Literal
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-TaskStatus = Literal[
-    "created", "routing", "planning", "running", "waiting_tool",
-    "waiting_human", "summarizing", "completed", "failed", "cancelled"
+AgentRunStatus = Literal["created", "running", "completed", "failed", "cancelled"]
+AgentRunStepKind = Literal[
+    "pattern_selection", "pattern_transition", "model_invocation",
+    "tool_execution", "finalization", "agent", "workflow", "human", "system"
 ]
+AgentRunStepStatus = Literal["pending", "running", "completed", "failed", "cancelled", "skipped"]
 
-StepType = Literal["model", "tool", "agent", "workflow", "human", "system"]
-StepStatus = Literal["pending", "running", "completed", "failed", "skipped"]
-
-class Task(BaseModel):
-    task_id: str
+class AgentRun(BaseModel):
+    agent_run_id: str
     session_id: str | None = None
-    goal: str
-    status: TaskStatus = "created"
-    skill_id: str | None = None
-    root_agent_id: str | None = None
+    input_message_id: str | None = None
+    mode: Literal["chat", "plan", "build", "review"] = "chat"
+    requested_pattern: str | None = None
+    active_pattern: str | None = None
+    status: AgentRunStatus = "created"
+    context_message_sequence: int | None = None
+    trace_id: str
+    finish_reason: str | None = None
+    error_type: str | None = None
     max_steps: int = 30
     timeout_seconds: int = 600
     cost_budget_usd: float | None = None
@@ -214,12 +224,14 @@ class Task(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-class TaskStep(BaseModel):
+class AgentRunStep(BaseModel):
     step_id: str
-    task_id: str
+    agent_run_id: str
     index: int
-    type: StepType
-    status: StepStatus = "pending"
+    kind: AgentRunStepKind
+    status: AgentRunStepStatus = "pending"
+    pattern: str | None = None
+    invocation_id: str | None = None
     input: dict[str, Any] = Field(default_factory=dict)
     output: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
@@ -240,7 +252,7 @@ class RuntimeEvent(BaseModel):
     event_id: str
     event_type: RuntimeEventType
     event_version: int = 1
-    task_id: str | None = None
+    agent_run_id: str | None = None
     step_id: str | None = None
     session_id: str | None = None
     trace_id: str
@@ -341,7 +353,7 @@ class ToolDefinition(BaseModel):
 
 class ToolInvocation(BaseModel):
     invocation_id: str
-    task_id: str
+    agent_run_id: str
     tool_name: str
     arguments: dict[str, Any]
     approved: bool = False
@@ -427,7 +439,7 @@ HookAction = Literal["continue", "modify", "block"]
 
 class HookContext(BaseModel):
     hook_name: str
-    task_id: str | None = None
+    agent_run_id: str | None = None
     session_id: str | None = None
     agent_id: str | None = None
     skill_id: str | None = None
@@ -453,7 +465,7 @@ MemoryType = Literal["summary"]
 class MemoryItem(BaseModel):
     memory_id: str
     session_id: str | None = None
-    task_id: str | None = None
+    source_agent_run_id: str | None = None
     type: MemoryType = "summary"
     content: str
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -475,7 +487,7 @@ runtime/
 ├── dispatcher.py          # 事件/步骤分发
 ├── scheduler.py           # step 调度，区别于平台级 scheduler/
 ├── step_runner.py         # 执行 model/tool/agent/workflow step
-├── state_machine.py       # Task 状态机
+├── state_machine.py       # AgentRun 生命周期状态机
 ├── cancellation.py        # 取消控制
 ├── checkpoint.py          # checkpoint 保存/恢复
 ├── replay.py              # replay 基础逻辑
@@ -492,9 +504,11 @@ runtime/
 class AgentRuntimeKernel:
     def __init__(
         self,
-        task_repo: TaskRepository,
+        run_repo: AgentRunRepository,
         event_store: EventStore,
         session_manager: SessionManager,
+        pattern_selector: PatternSelector,
+        pattern_registry: PatternRegistry,
         model_registry: ModelRegistry,
         prompt_engine: PromptEngine,
         skill_engine: SkillEngine,
@@ -508,107 +522,96 @@ class AgentRuntimeKernel:
     ) -> None:
         ...
 
-    async def start_task(self, request: AgentRequest) -> Task:
+    async def start_run(self, request: AgentRequest) -> AgentRun:
         ...
 
-    async def run_until_complete(self, task_id: str) -> Task:
+    async def run_until_complete(self, agent_run_id: str) -> AgentRun:
         ...
 
-    async def cancel_task(self, task_id: str) -> None:
+    async def cancel_run(self, agent_run_id: str) -> None:
         ...
 
-    async def get_task_state(self, task_id: str) -> Task:
+    async def get_run_state(self, agent_run_id: str) -> AgentRun:
         ...
 ```
 
 ## 6.3 Runtime 主循环伪代码
 
 ```python
-async def run_until_complete(task_id: str) -> Task:
-    task = await task_repo.get(task_id)
-    ctx = await runtime_context_builder.build(task)
+async def run_until_complete(agent_run_id: str) -> AgentRun:
+    run = await run_repo.get(agent_run_id)
+    ctx = await runtime_context_builder.build(run)
 
-    await hooks.dispatch("before_task_start", ctx.to_hook_context())
-    await events.append("TaskStarted", task_id=task.task_id)
+    await hooks.dispatch("before_agent_run_start", ctx.to_hook_context())
+    await events.append("AgentRunStarted", agent_run_id=run.agent_run_id)
+    pattern = await pattern_selector.select(run, ctx)
+    await events.append("PatternSelected", agent_run_id=run.agent_run_id, payload={"pattern": pattern.name})
 
     step_count = 0
 
-    while task.status not in {"completed", "failed", "cancelled"}:
+    while run.status not in {"completed", "failed", "cancelled"}:
         step_count += 1
 
-        if step_count > task.max_steps:
-            await fail_task(task, "max_steps_exceeded")
+        if step_count > run.max_steps:
+            await fail_run(run, "max_steps_exceeded")
             break
 
-        if await cancellation.is_cancelled(task.task_id):
-            await cancel_task(task.task_id)
+        if await cancellation.is_cancelled(run.agent_run_id):
+            await cancel_run(run.agent_run_id)
             break
 
-        await runtime_policy.check_timeout(task)
-        await runtime_policy.check_budget(task)
+        await runtime_policy.check_timeout(run)
+        await runtime_policy.check_budget(run)
 
-        context_bundle = await context_manager.assemble(task)
-        skill = await skill_engine.resolve(task, context_bundle)
+        context_bundle = await context_manager.assemble(run)
+        action = await pattern.next_action(run, context_bundle)
 
-        model_request = await prompt_engine.render_for_task(
-            task=task,
-            skill=skill,
-            context=context_bundle,
-        )
+        if action.kind == "transition_pattern":
+            pattern = await pattern_registry.require(action.pattern)
+            await events.append("PatternTransitioned", agent_run_id=run.agent_run_id)
+            continue
+        if action.kind == "complete":
+            await session_manager.append_final_response(run, action.response)
+            run.status = "completed"
+            await run_repo.save(run)
+            break
 
-        model_request = await hooks.dispatch_payload(
-            "before_model_call",
-            task_id=task.task_id,
-            skill_id=skill.name,
-            payload=model_request,
-        )
+        model_request = action.model_request
+        model_request.metadata["agent_run_id"] = run.agent_run_id
 
-        response = await model_registry.invoke(model_request)
-        await events.append("ModelCalled", task_id=task.task_id, payload=response.model_dump())
-        await hooks.dispatch("after_model_call", payload={"response": response.model_dump()})
+        reducer = ModelStreamReducer()
+        async for stream_event in model_registry.stream(model_request):
+            reducer.consume(stream_event)
+            await stream.forward_public_delta(stream_event)
+        response = reducer.response()
+        await events.append("ModelInvocationCompleted", agent_run_id=run.agent_run_id)
 
         if response.tool_calls:
-            for tool_call in response.tool_calls:
-                tool_result = await tool_router.invoke_from_model_call(task, tool_call)
-                await context_manager.append_observation(task, tool_result)
+            await pattern.accept_observation(response)
             continue
 
-        await memory_manager.maybe_update_summary(task, response)
-        await events.append("TaskCompleted", task_id=task.task_id, payload={"content": response.content})
-        task.status = "completed"
-        await task_repo.save(task)
-        break
+        await pattern.accept_observation(response)
 
-    await hooks.dispatch("after_task_complete", ctx.to_hook_context())
-    return task
+    await hooks.dispatch("after_agent_run_complete", ctx.to_hook_context())
+    return run
 ```
 
 ## 6.4 状态机转换
 
 ```text
 created
-  -> routing
-  -> planning
   -> running
-  -> waiting_tool
-  -> running
-  -> summarizing
   -> completed
 
-failed/cancelled 可从 routing/planning/running/waiting_tool/summarizing 转入。
+failed/cancelled 可从 running 转入。pattern 的 routing/planning/react/reflection 行为作为 step/event 表达，不属于顶层状态。
 ```
 
 ### 转换规则
 
 | From | To | 触发条件 |
 |---|---|---|
-| created | routing | start_task |
-| routing | planning | skill / route resolved |
-| planning | running | plan generated or no plan required |
-| running | waiting_tool | model response contains tool calls |
-| waiting_tool | running | tool result appended |
-| running | summarizing | final response ready |
-| summarizing | completed | memory summary update done |
+| created | running | start_run |
+| running | completed | final response committed to session |
 | any active | failed | unhandled exception / policy block |
 | any active | cancelled | user/system cancel |
 
@@ -674,7 +677,7 @@ api/
 ├── middleware.py
 ├── routers/
 │   ├── health.py
-│   ├── tasks.py
+│   ├── agent_runs.py
 │   ├── sessions.py
 │   ├── skills.py
 │   ├── prompts.py
@@ -694,7 +697,7 @@ from fastapi import FastAPI
 def create_app() -> FastAPI:
     app = FastAPI(title="Agent Platform", version="0.1.0")
     app.include_router(health.router, prefix="/health")
-    app.include_router(tasks.router, prefix="/v1/tasks")
+    app.include_router(agent_runs.router, prefix="/v1/agent-runs")
     app.include_router(sessions.router, prefix="/v1/sessions")
     app.include_router(skills.router, prefix="/v1/skills")
     app.include_router(prompts.router, prefix="/v1/prompts")
@@ -707,17 +710,18 @@ def create_app() -> FastAPI:
 
 ## 8.3 Endpoint 设计
 
-### Tasks
+### Agent Runs
 
 ```text
-POST /v1/tasks
-GET  /v1/tasks/{task_id}
-GET  /v1/tasks/{task_id}/events
-POST /v1/tasks/{task_id}/cancel
-POST /v1/tasks/{task_id}/replay
+POST /v1/agent-runs
+GET  /v1/agent-runs/{agent_run_id}
+GET  /v1/agent-runs/{agent_run_id}/events
+GET  /v1/agent-runs/{agent_run_id}/stream
+POST /v1/agent-runs/{agent_run_id}/cancel
+POST /v1/agent-runs/{agent_run_id}/replay
 ```
 
-#### POST `/v1/tasks`
+#### POST `/v1/agent-runs`
 
 Request:
 
@@ -737,7 +741,7 @@ Response:
 
 ```json
 {
-  "task_id": "task_...",
+  "agent_run_id": "run_...",
   "status": "created"
 }
 ```
@@ -792,6 +796,8 @@ POST /v1/a2a/tasks
 GET  /v1/a2a/tasks/{task_id}
 ```
 
+`A2A task` 是外部协议资源名称；进入平台后映射为内部 `AgentRun`，不得作为内部 runtime 主键语义复用。
+
 ---
 
 ## 9. CLI 低层设计
@@ -818,7 +824,7 @@ cli/
 ```bash
 agent-platform run "帮我制定一个学习计划"
 agent-platform chat
-agent-platform replay task_123
+agent-platform replay run_123
 agent-platform skills list
 agent-platform prompts list
 agent-platform prompts render planner.create_plan --var goal="..."
@@ -979,9 +985,9 @@ class PromptEngine:
     ) -> PromptRenderResult:
         ...
 
-    async def render_for_task(
+    async def render_for_run(
         self,
-        task: Task,
+        run: AgentRun,
         skill: ResolvedSkill,
         context: ContextBundle,
     ) -> ModelRequest:
@@ -1008,7 +1014,7 @@ Resolve template name/version
 prompts/builtin/general_agent/
 ├── prompt.yaml
 ├── system.md
-├── task.md
+├── entry.md
 └── output.schema.json
 ```
 
@@ -1031,7 +1037,7 @@ prompts/builtin/general_agent/
 - 如果信息不足，提出澄清问题。
 ```
 
-`task.md`：
+`entry.md`：
 
 ```text
 用户目标：
@@ -1094,7 +1100,7 @@ type: general
 
 prompts:
   system: general_agent.system
-  entry: general_agent.task
+  entry: general_agent.entry
   summarizer: summarizer.session_summary
 
 tools:
@@ -1144,8 +1150,8 @@ MVP 逻辑：
 
 ```python
 class SkillResolver:
-    async def resolve(self, task: Task, context: ContextBundle) -> ResolvedSkill:
-        skill_name = task.metadata.get("skill") or "general"
+    async def resolve(self, run: AgentRun, context: ContextBundle) -> ResolvedSkill:
+        skill_name = run.metadata.get("skill") or "general"
         version = self.deployment.resolve_skill_version(skill_name)
         manifest = await self.registry.get(skill_name, version)
         return ResolvedSkill.from_manifest(manifest)
@@ -1173,7 +1179,7 @@ hooks/
 │   ├── tool_risk_guard.py
 │   └── memory_write_guard.py
 └── lifecycle/
-    ├── task_hooks.py
+    ├── agent_run_hooks.py
     ├── model_hooks.py
     ├── tool_hooks.py
     ├── prompt_hooks.py
@@ -1204,9 +1210,9 @@ class HookManager:
 ## 13.3 MVP Hook Points
 
 ```text
-before_task_start
-after_task_complete
-on_task_error
+before_agent_run_start
+after_agent_run_complete
+on_agent_run_error
 before_prompt_send
 before_model_call
 after_model_call
@@ -1238,18 +1244,24 @@ class ToolRiskGuard:
 
 | Pattern | MVP 实现 |
 |---|---|
+| Single Turn | 直接完成单次用户请求的基线策略 |
 | Prompt Chaining | Linear chain runner |
-| Routing | Rule + LLM router 基础版 |
-| Planning | Simple Todo Planner |
+| Routing | Rule + LLM router，允许选择/切换 pattern |
+| Planning | 规划推理与输出策略；不创建持久化 Task |
+| ReAct | Model/action/observation 循环，工具 action 通过 runtime 执行 |
+| Reflection | Critic/Verifier/Reviser 路径 |
 | Parallelization | 暂不实现，保留接口 |
-| Reflection | 暂不作为默认路径，保留接口 |
 
 ## 14.2 目录
 
 ```text
 patterns/
 ├── base.py
-├── orchestrator.py
+├── registry.py
+├── selector.py
+├── modes.py
+├── single_turn/
+│   └── pattern.py
 ├── chaining/
 │   ├── chain.py
 │   └── runner.py
@@ -1259,21 +1271,25 @@ patterns/
 │   └── llm_router.py
 ├── planning/
 │   ├── planner.py
-│   ├── todo.py
+│   └── schemas.py
+├── react/
+│   ├── pattern.py
 │   └── schemas.py
 └── reflection/
     ├── critic.py
     └── verifier.py
 ```
 
-## 14.3 Simple Planner
+## 14.3 Pattern 与 Task Engine 边界
 
-```python
-class TodoPlanner:
-    async def create_plan(self, goal: str, context: ContextBundle) -> Plan:
-        # MVP 可以先通过 LLM 生成 JSON todo list。
-        ...
+```text
+PlanningPattern
+  -> 本阶段：生成或推进规划型 AgentRun 行为
+  -> 后续 v1 Task Engine：内存 todo + reminder
+  -> 后续 v2 Task Engine：磁盘 Markdown plan
 ```
+
+当前 runtime/session/pattern 变更不得以 Task 持久化、reminder 或 Markdown plan 作为验收条件。
 
 ---
 
@@ -1300,7 +1316,7 @@ class BaseAgent(Protocol):
     name: str
     description: str
 
-    async def run(self, task: Task, context: ContextBundle) -> AgentResult:
+    async def run(self, run: AgentRun, context: ContextBundle) -> AgentResult:
         ...
 ```
 
@@ -1524,7 +1540,7 @@ context/
 
 ```python
 class ContextBundle(BaseModel):
-    task: Task
+    run: AgentRun
     session_messages: list[Message] = []
     memory_summary: str | None = None
     tool_observations: list[ToolResult] = []
@@ -1536,7 +1552,7 @@ class ContextBundle(BaseModel):
 ## 18.3 Assemble 流程
 
 ```text
-Load task
+Load agent run
 → Load session history
 → Load summary memory
 → Load pending observations
@@ -1573,7 +1589,7 @@ class MemoryManager:
     async def get_summary(self, session_id: str | None) -> str | None:
         ...
 
-    async def maybe_update_summary(self, task: Task, response: ModelResponse) -> MemoryItem | None:
+    async def maybe_update_summary(self, run: AgentRun, response: ModelResponse) -> MemoryItem | None:
         ...
 ```
 
@@ -1582,8 +1598,8 @@ class MemoryManager:
 MVP 策略：
 
 ```text
-1. 每个 completed task 后判断是否需要更新 summary。
-2. 如果 session_id 不存在，则使用 task_id 级 summary。
+1. 每个 completed agent run 后判断是否需要更新 summary。
+2. 如果 session_id 不存在，则使用 agent_run_id 级 summary。
 3. 使用 summarizer prompt 生成新 summary。
 4. before_memory_write hook 检查。
 5. 保存 MemoryItem(type="summary")。
@@ -1631,9 +1647,9 @@ MVP 本地路径：
 ```text
 .data/
 ├── workspace/
-│   └── {task_id}/
+│   └── {agent_run_id}/
 ├── artifacts/
-│   └── {task_id}/
+│   └── {agent_run_id}/
 └── memories/
 ```
 
@@ -1657,8 +1673,8 @@ class VFS:
 路径约束：
 
 ```text
-/workspace/{task_id}/...
-/artifacts/{task_id}/...
+/workspace/{agent_run_id}/...
+/artifacts/{agent_run_id}/...
 /memories/...
 ```
 
@@ -1689,7 +1705,7 @@ sandbox/
 仅开发环境使用。
 默认禁用 shell。
 python_exec 必须显式开启。
-限制 cwd 为 /workspace/{task_id}。
+限制 cwd 为 /workspace/{agent_run_id}。
 限制 timeout。
 捕获 stdout/stderr。
 不保证强安全隔离。
@@ -1817,7 +1833,7 @@ skills:
 
 prompts:
   general_agent.system: 0.1.0
-  general_agent.task: 0.1.0
+  general_agent.entry: 0.1.0
   summarizer.session_summary: 0.1.0
 
 policies:
@@ -1855,30 +1871,37 @@ storage:
 
 ## 24.2 表设计
 
-### tasks
+### agent_runs
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| task_id | string pk | task id |
+| agent_run_id | string pk | agent run id |
 | session_id | string nullable | session id |
-| goal | text | 用户目标 |
-| status | string | task status |
-| skill_id | string nullable | selected skill |
-| root_agent_id | string nullable | root agent |
+| input_message_id | string nullable | initiating user message |
+| mode | string | chat/plan/build/review |
+| requested_pattern | string nullable | requested pattern |
+| active_pattern | string nullable | selected/current pattern |
+| context_message_sequence | int nullable | session history watermark |
+| status | string | agent run status |
+| trace_id | string | run trace |
+| finish_reason | string nullable | completion reason |
+| error_type | string nullable | terminal failure category |
 | max_steps | int | max step |
 | timeout_seconds | int | timeout |
 | metadata | json | metadata |
 | created_at | datetime | created time |
 | updated_at | datetime | updated time |
 
-### task_steps
+### agent_run_steps
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | step_id | string pk | step id |
-| task_id | string index | task id |
+| agent_run_id | string index | agent run id |
 | index | int | step index |
-| type | string | model/tool/agent/system |
+| kind | string | pattern_selection/model_invocation/tool_execution/finalization/... |
+| pattern | string nullable | pattern owning the step |
+| invocation_id | string nullable | associated model invocation |
 | status | string | pending/running/completed/failed |
 | input | json | input |
 | output | json | output |
@@ -1893,7 +1916,7 @@ storage:
 | event_id | string pk | event id |
 | event_type | string index | event type |
 | event_version | string | schema version |
-| task_id | string index nullable | task id |
+| agent_run_id | string index nullable | agent run id |
 | session_id | string nullable | session id |
 | trace_id | string index | trace id |
 | span_id | string | span id |
@@ -1919,6 +1942,8 @@ storage:
 |---|---|---|
 | message_id | string pk | message id |
 | session_id | string index | session id |
+| sequence | int | monotonically increasing session order |
+| agent_run_id | string nullable | producing/consuming run |
 | role | string | role |
 | content | text | content |
 | metadata | json | metadata |
@@ -1930,7 +1955,7 @@ storage:
 |---|---|---|
 | memory_id | string pk | memory id |
 | session_id | string nullable | session id |
-| task_id | string nullable | task id |
+| source_agent_run_id | string nullable | producing run |
 | type | string | summary |
 | content | text | summary content |
 | metadata | json | metadata |
@@ -1942,7 +1967,7 @@ storage:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | artifact_id | string pk | artifact id |
-| task_id | string index | task id |
+| agent_run_id | string index | producing run |
 | path | string | vfs path |
 | type | string | report/file/json/etc |
 | metadata | json | metadata |
@@ -1978,11 +2003,11 @@ observability/
 
 ## 25.2 MVP 要求
 
-每个 task 记录：
+每个 agent run 记录：
 
 ```text
 trace_id
-task_id
+agent_run_id
 model calls
 model latency
 input/output tokens
@@ -1995,7 +2020,7 @@ errors
 ## 25.3 Event 与 Trace 关系
 
 ```text
-RuntimeEvent.trace_id = Task.trace_id
+RuntimeEvent.trace_id = AgentRun.trace_id
 RuntimeEvent.span_id = 每个 step/tool/model call 唯一 span
 ```
 
@@ -2020,7 +2045,7 @@ workers/
 
 | Worker | MVP 是否实现 | 说明 |
 |---|---|---|
-| RuntimeWorker | 是 | 执行 task |
+| RuntimeWorker | 是 | 执行 agent run |
 | ToolWorker | 可选 | 初期同步执行，后期异步化 |
 | MemoryWorker | 可选 | summary 可同步更新 |
 | SandboxWorker | 否 | Phase 3 |
@@ -2086,7 +2111,7 @@ skills:
   general: 0.1.0
 prompts:
   general_agent.system: 0.1.0
-  general_agent.task: 0.1.0
+  general_agent.entry: 0.1.0
   summarizer.session_summary: 0.1.0
 policies:
   tool_policy: 0.1.0
@@ -2116,7 +2141,7 @@ class RuntimeTimeoutError(AgentPlatformError): ...
 所有未捕获异常写入：
 
 ```text
-TaskFailed
+AgentRunFailed
 ModelCallFailed
 ToolCallFailed
 PromptRenderFailed
@@ -2169,7 +2194,7 @@ SENSITIVE_KEYS = {"api_key", "token", "secret", "password", "authorization"}
 ### 30.1 API 调用
 
 ```bash
-curl -X POST http://localhost:8000/v1/tasks \
+curl -X POST http://localhost:8000/v1/agent-runs \
   -H "Authorization: Bearer dev-key" \
   -H "Content-Type: application/json" \
   -d '{"goal":"帮我制定一个 Python Agent 项目的启动计划"}'
@@ -2178,17 +2203,17 @@ curl -X POST http://localhost:8000/v1/tasks \
 ### 30.2 内部流程
 
 ```text
-POST /v1/tasks
+POST /v1/agent-runs
 → AccessContext(default/local-user)
-→ TaskCreated
-→ RuntimeWorker picks task
+→ AgentRunCreated
+→ RuntimeWorker picks agent run
 → SkillResolver: general@0.1.0
 → ContextAssembler: no history, no summary
-→ PromptEngine render general_agent.task@0.1.0
+→ PromptEngine render general_agent.entry@0.1.0
 → OpenAIModelAdapter.invoke
 → response without tool call
 → SummaryMemory updated
-→ TaskCompleted
+→ AgentRunCompleted
 → return response
 ```
 
@@ -2241,7 +2266,7 @@ tests/unit/
 
 ```text
 tests/integration/
-├── test_task_api.py
+├── test_agent_run_api.py
 ├── test_agent_loop_no_tool.py
 ├── test_agent_loop_with_tool.py
 ├── test_mcp_tool_call.py
@@ -2254,12 +2279,12 @@ tests/integration/
 
 | 测试 | 预期 |
 |---|---|
-| 创建 task | 返回 task_id |
-| mock model 完成任务 | task completed |
-| OpenAI model 完成任务 | task completed |
+| 创建 agent run | 返回 agent_run_id |
+| mock model 完成执行 | agent run completed |
+| OpenAI model 完成执行 | agent run completed |
 | calculator tool call | 结果写入 observation |
 | high risk tool | 被 hook/policy 阻断 |
-| summary memory | task 完成后写入 summary |
+| summary memory | agent run 完成后写入 summary |
 | events replay | 能查询完整事件列表 |
 | prompt version lock | 使用 deployment lock 中版本 |
 | mcp list tools | 返回 MCP tools |
@@ -2279,11 +2304,11 @@ tests/integration/
 
 ### Sprint 2：Runtime + Events
 
-1. Task repository。
-2. Event store。
+1. AgentRun repository（放在 `src/storage/database/repositories`）。
+2. Event store（repository/model 放在 `src/storage/database`）。
 3. Runtime state machine。
 4. Runtime loop with mock model。
-5. Task API。
+5. AgentRun API。
 
 ### Sprint 3：Prompt + Model
 
@@ -2324,8 +2349,8 @@ tests/integration/
 MVP 完成需满足：
 
 ```text
-1. API 可创建并执行通用 Agent 任务。
-2. CLI 可运行通用 Agent 任务。
+1. API 可创建并执行通用 AgentRun。
+2. CLI 可运行通用 AgentRun。
 3. 支持 OpenAI 与 Mock Model。
 4. 支持 Prompt 模板渲染与版本锁定。
 5. 支持 General Skill 加载。
@@ -2335,7 +2360,7 @@ MVP 完成需满足：
 9. 支持 A2A agent card 与 task endpoint。
 10. 支持 Summary Memory。
 11. 支持 Local VFS。
-12. 支持 Event Store 与任务 replay 查询。
+12. 支持 Event Store 与 AgentRun replay 查询。
 13. 支持基础 Observability：trace、token、cost、latency。
 14. 高风险工具默认被阻断。
 15. 单元测试覆盖 Runtime、Prompt、Skill、Hook、Tool、Memory、VFS。

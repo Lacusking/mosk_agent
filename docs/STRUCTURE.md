@@ -30,25 +30,24 @@ src/
 │   ├── retry.py         # 指数退避重试装饰器
 │   └── async_task.py    # 异步任务队列（Worker Pool）
 ├── exceptions/          # 平台正式结构化异常入口，包含模型调用决策错误
-├── contracts/           # 跨模块契约命名空间，按数据持久化与运行时职责分域
-│   ├── database/        # 数据库映射契约
-│   │   ├── base.py      # ORM 基础模型（PkModel、TimestampedModel）
-│   │   └── orm_types.py # 自定义 ORM 枚举类型
+├── contracts/           # 跨模块契约命名空间；只放 Pydantic/公开数据契约，不放持久化实现
+│   ├── database/        # 兼容导出入口；实际 ORM 基础设施位于 storage/database
 │   └── runtime/         # Agent runtime 公开数据契约
 │       ├── messages.py  # 模型消息与 content blocks
 │       ├── models.py    # 模型请求、响应、usage 与实时流事件
 │       └── events.py    # 模型生命周期 durable event payload/envelope
 │
-├── runtime/             # Agent 运行时内核：事件循环、调度器、状态机、Step Runner、Checkpoint、Replay
-├── events/              # 当前暴露事件契约；Event Store/Event Bus 属于后续建设
-├── tasks/               # 任务管理：Task、TaskStep、Task Graph、DAG、状态、进度、任务仓储
-├── sessions/            # 会话管理：Session、对话历史、上下文压缩、会话生命周期、会话状态持久化
+├── runtime/             # Agent 运行时内核：AgentRun 事件循环、调度器、状态机、Step Runner、Checkpoint、Replay
+├── events/              # 事件契约/服务发现入口；RuntimeEvent repository 位于 storage/database/repositories
+├── agent_runs/          # 执行记录业务层：AgentRun manager、状态编排；ORM/repository 位于 storage/database
+├── tasks/               # 后续计划引擎：todo/reminder/持久化 plan；不作为 Agent 执行生命周期
+├── sessions/            # 会话业务层：Session manager、消息转换、上下文压缩；ORM/repository 位于 storage/database
 ├── scheduler/           # 平台级调度器：定时任务、延迟任务、周期任务、后台任务、锁、租约、队列
 │
 ├── models/              # 模型适配层：OpenAI Chat/Responses 与 Mock；Anthropic 仅预留协议身份
 ├── prompts/             # Prompt 引擎：模板管理、变量解析、格式化、版本管理、结构化输出、Prompt Pack
 ├── skills/              # Skill 能力引擎：将 Prompt、Tool、Workflow、Policy、Memory Scope 组合为可复用能力包
-├── hooks/               # Hook 生命周期扩展：before/after model/tool/memory/task 等拦截器与治理注入点
+├── hooks/               # Hook 生命周期扩展：before/after model/tool/memory/agent-run 等拦截器与治理注入点
 ├── patterns/            # Agentic 设计模式：提示链、路由、并行化、规划、反思、自修正、资源优化
 ├── workflow/            # 确定性工作流引擎：DAG、步骤流转、条件分支、重试、补偿、Workflow 版本管理
 │
@@ -76,7 +75,12 @@ src/
 ├── control_plane/       # 控制面：Agent、Skill、Tool、Prompt、Policy、Memory、Eval、Deployment 的管理服务
 ├── deployment/          # 部署与版本：Agent/Skill/Prompt/Policy 发布、环境绑定、灰度、回滚、lockfile
 ├── storage/             # 存储层：PostgreSQL、Redis、对象存储、向量库、Repository、ORM Model
-│   ├── database.py      # SQLAlchemy 异步引擎与会话工厂
+│   ├── database/        # 数据库基础设施集中目录
+│   │   ├── session.py   # SQLAlchemy 异步引擎与会话工厂
+│   │   ├── base.py      # ORM 基础模型（PkModel、TimestampedModel）
+│   │   ├── orm_types.py # 自定义 ORM 枚举类型
+│   │   ├── models/      # 所有 ORM records，按领域拆文件
+│   │   └── repositories/# 所有数据库 repository，按领域拆文件
 │   └── redis.py         # Redis 异步客户端
 ├── workers/             # 异步 Worker：Runtime Worker、Tool Worker、Memory Worker、Sandbox Worker、Eval Worker
 └── plugins/             # 插件系统：第三方 Tool、Skill、Hook、Model Adapter、Connector 的加载与扩展机制
@@ -99,7 +103,7 @@ tests/                   # 测试
 |------|------|------|
 | **接入与接口层** | access, identity, api, cli | 统一入口处理、身份认证、权限控制、API 服务、CLI 工具 |
 | **基础与契约层** | core, contracts | 公共组件、类型定义、异常处理、统一数据契约 |
-| **运行时核心层** | runtime, events, tasks, sessions, scheduler | Agent 执行内核、事件驱动、任务编排、会话管理、调度系统 |
+| **运行时核心层** | runtime, events, agent_runs, sessions, scheduler | Agent 执行内核、事件驱动、运行记录、会话管理、调度系统 |
 | **智能能力层** | models, prompts, skills, hooks, patterns, workflow | 模型适配、Prompt 引擎、Skill 封装、生命周期钩子、设计模式、工作流 |
 | **Agent 层** | agents, multi_agent | Agent 抽象与实现、单 Agent 与多 Agent 协作、A2A/MCP 协议 |
 | **工具与知识层** | tools, connectors, context, memory, knowledge, rag | 工具系统、外部连接器、上下文管理、记忆系统、知识资产、RAG |
