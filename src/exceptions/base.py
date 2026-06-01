@@ -8,6 +8,7 @@ class BaseError(Exception):
 
     code: int = 50000
     default_msg: str = "未知错误"
+    http_status: int = 400
 
     def __init__(
         self,

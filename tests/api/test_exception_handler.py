@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.api.exception_handler import register_exception
+from src.exceptions import AgentRunConflictError
 from src.exceptions import BaseError
 from src.exceptions import ValidationError
 
@@ -34,9 +35,36 @@ def test_base_error_is_handled_from_new_exception_package() -> None:
     )
 
     assert isinstance(response, JSONResponse)
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert json.loads(response.body) == {
         "code": 40000,
         "msg": "请求被拒绝",
         "data": {"field": "goal"},
+    }
+
+
+def test_base_error_handler_uses_exception_http_status() -> None:
+    app = FastAPI()
+    register_exception(app)
+    handler = app.exception_handlers[BaseError]
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/agent-runs",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("testclient", 50000),
+        }
+    )
+
+    response = asyncio.run(handler(request, AgentRunConflictError()))
+
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 409
+    assert json.loads(response.body) == {
+        "code": 40901,
+        "msg": "AgentRun 冲突",
     }

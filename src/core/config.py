@@ -6,8 +6,11 @@
 
 import os
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import Field
+from pydantic import field_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -83,6 +86,86 @@ class ModelProviderConfig(AppBaseSetting):
     MOCK_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
 
 
+class AgentRuntimeConfig(AppBaseSetting):
+    """AgentRun 与 pattern 选择的受控运行配置。"""
+
+    _SUPPORTED_MODES: ClassVar[frozenset[str]] = frozenset({"chat", "plan", "build", "review"})
+    _SUPPORTED_PATTERNS: ClassVar[frozenset[str]] = frozenset(
+        {"single_turn", "chaining", "routing", "planning", "react", "reflection"}
+    )
+
+    DEFAULT_AGENT_MODE: str = Field(default="chat")
+    DEFAULT_CHAT_PATTERN: str = Field(default="single_turn")
+    DEFAULT_PLAN_PATTERN: str = Field(default="planning")
+    DEFAULT_BUILD_PATTERN: str = Field(default="react")
+    DEFAULT_REVIEW_PATTERN: str = Field(default="reflection")
+    AGENT_RUN_MAX_STEPS: int = Field(default=12, gt=0)
+    AGENT_RUN_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
+    AGENT_RUN_MODEL_RETRY_LIMIT: int = Field(default=1, ge=0)
+    ENABLE_MOCK_TOOL_ACTIONS: bool = Field(default=True)
+
+    @field_validator("DEFAULT_AGENT_MODE")
+    @classmethod
+    def validate_mode(cls, value: str) -> str:
+        """校验默认 Agent mode。
+
+        Args:
+            value: 待校验的 mode。
+
+        Returns:
+            已校验的 mode。
+
+        Raises:
+            ValueError: mode 不在当前支持集合内。
+        """
+        if value not in cls._SUPPORTED_MODES:
+            raise ValueError("DEFAULT_AGENT_MODE 不受支持")
+        return value
+
+    @field_validator(
+        "DEFAULT_CHAT_PATTERN",
+        "DEFAULT_PLAN_PATTERN",
+        "DEFAULT_BUILD_PATTERN",
+        "DEFAULT_REVIEW_PATTERN",
+    )
+    @classmethod
+    def validate_pattern(cls, value: str) -> str:
+        """校验默认 pattern 名称。
+
+        Args:
+            value: 待校验的 pattern。
+
+        Returns:
+            已校验的 pattern。
+
+        Raises:
+            ValueError: pattern 不在当前支持集合内。
+        """
+        if value not in cls._SUPPORTED_PATTERNS:
+            raise ValueError("默认 pattern 不受支持")
+        return value
+
+    @model_validator(mode="after")
+    def validate_default_mode_pattern(self) -> "AgentRuntimeConfig":
+        """确认默认 mode 对应的 pattern 已配置。
+
+        Returns:
+            已校验的 Agent runtime 配置。
+
+        Raises:
+            ValueError: 默认 mode 没有对应 pattern 配置。
+        """
+        mode_to_pattern = {
+            "chat": self.DEFAULT_CHAT_PATTERN,
+            "plan": self.DEFAULT_PLAN_PATTERN,
+            "build": self.DEFAULT_BUILD_PATTERN,
+            "review": self.DEFAULT_REVIEW_PATTERN,
+        }
+        if not mode_to_pattern[self.DEFAULT_AGENT_MODE]:
+            raise ValueError("DEFAULT_AGENT_MODE 缺少对应默认 pattern")
+        return self
+
+
 class Config(BaseSettings):
     """聚合配置入口。"""
 
@@ -91,6 +174,7 @@ class Config(BaseSettings):
     log: LogConfig = LogConfig()
     app: AppConfig = AppConfig()
     models: ModelProviderConfig = ModelProviderConfig()
+    agent_runtime: AgentRuntimeConfig = AgentRuntimeConfig()
 
 
 settings = Config()

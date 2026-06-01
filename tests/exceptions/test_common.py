@@ -1,5 +1,6 @@
 """平台通用结构化异常测试。"""
 
+from src.exceptions import AgentRunConflictError
 from src.exceptions import AuthenticationError
 from src.exceptions import BaseError
 from src.exceptions import ConfigurationError
@@ -14,6 +15,7 @@ class TestBaseError:
         err = BaseError()
         assert err.msg == "未知错误"
         assert err.code == 50000
+        assert err.http_status == 400
 
     def test_custom_message(self) -> None:
         err = BaseError(msg="自定义错误", data={"key": "value"})
@@ -44,17 +46,29 @@ class TestSpecificErrors:
         err = ValidationError()
         assert err.code == 40000
         assert err.msg == "参数校验失败"
+        assert err.http_status == 422
 
     def test_not_found_error(self) -> None:
         err = NotFoundError(msg="用户不存在")
         assert err.code == 40400
         assert err.msg == "用户不存在"
+        assert err.http_status == 404
 
     def test_authentication_error(self) -> None:
-        assert AuthenticationError().code == 40100
+        err = AuthenticationError()
+        assert err.code == 40100
+        assert err.http_status == 401
 
     def test_forbidden_error(self) -> None:
-        assert ForbiddenError().code == 40300
+        err = ForbiddenError()
+        assert err.code == 40300
+        assert err.http_status == 403
+
+    def test_agent_run_conflict_error(self) -> None:
+        err = AgentRunConflictError()
+        assert err.code == 40901
+        assert err.msg == "AgentRun 冲突"
+        assert err.http_status == 409
 
     def test_configuration_error(self) -> None:
         assert ConfigurationError().code == 50001

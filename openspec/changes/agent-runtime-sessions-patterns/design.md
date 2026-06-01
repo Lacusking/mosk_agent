@@ -56,11 +56,12 @@ SessionManager: commit final assistant message only on completion
 |---|---|---|
 | `src/contracts` | Session、AgentRun、PatternAction、ToolAction、API stream payload；扩展 event 类型 | 不含 ORM 查询逻辑 |
 | `src/sessions` | 会话创建、消息顺序、history watermark、最终消息提交 | 不压缩 summary，不运行模型 |
-| `src/agent_runs` | AgentRun/step repository 与状态写入 | 不决定 pattern 算法 |
+| `src/agent_runs` | AgentRun/step 业务 manager 与状态编排 | 不决定 pattern 算法，不承载 ORM/repository 实现 |
 | `src/runtime` | kernel、动作执行、stream 映射、错误策略、取消、事件构造 | 不解析 provider wire body |
 | `src/patterns` | registry、selector、mode 映射和六类策略状态 | 不写 Session/EventStore，不直接执行 IO |
 | `src/tools` | `ToolActionExecutor` port 与 mock 实现 | 不是真实工具 registry/治理系统 |
-| `src/events` | RuntimeEvent repository/store | 不持久化逐 token delta |
+| `src/events` | RuntimeEvent 类型与服务发现入口 | 不持久化逐 token delta，不承载 repository 实现 |
+| `src/storage/database` | SQLAlchemy session、ORM base/types、ORM records、Session/AgentRun/RuntimeEvent repositories | 不放业务编排逻辑 |
 | `src/models` | 既有 ModelAdapter 和流归约输入 | 仅按前置 change 修订 `agent_run_id` metadata |
 | `src/api` | 认证后的 REST/SSE 适配 | 不包含运行编排逻辑 |
 
@@ -103,16 +104,16 @@ Runtime 为每个动作创建 step，执行后将 observation 反馈给同一 pa
 ### Sessions
 
 - `contracts/sessions.py` 定义 `SessionStatus`、`Session`、`SessionMessage` 与 API schemas。
-- `sessions/repository.py` 负责 Session CRUD、按 sequence 读取/追加消息及活动 run 关联检查。
+- `storage/database/repositories/sessions.py` 负责 Session CRUD、按 sequence 读取/追加消息及活动 run 关联检查。
 - `sessions/manager.py` 在创建 run 时原子追加 user message 并得到 `context_message_sequence`；仅在 run 成功完成后追加 assistant 消息。
 - 首期消息内容复用稳定的模型 content blocks 表达文本；内部 critique、route 与 tool observation 不进入历史。
 
 ### Agent Runs 与 Runtime
 
 - `contracts/agent_runs.py` 定义 `AgentRunStatus`、`AgentRun`、`AgentRunStep`、finish/error 信息与 API schema。
-- `agent_runs/repository.py` 持久化 run/step，使用条件更新保障终态不可反转。
+- `storage/database/repositories/agent_runs.py` 持久化 run/step，使用条件更新保障终态不可反转。
 - `runtime/kernel.py` 驱动动作循环；`runtime/state_machine.py` 校验状态转换；`runtime/error_policy.py` 消费 `ModelError`；`runtime/stream.py` 映射 SSE；`runtime/cancellation.py` 提供进程内取消令牌及持久化状态判断。
-- `events/repository.py` 持久化 RuntimeEvent；现有模型事件 envelope 在前置变更中将 `task_id` 更名为 `agent_run_id`，本变更新增 run/pattern/tool payload。
+- `storage/database/repositories/events.py` 持久化 RuntimeEvent；现有模型事件 envelope 在前置变更中将 `task_id` 更名为 `agent_run_id`，本变更新增 run/pattern/tool payload。
 
 ### Patterns
 

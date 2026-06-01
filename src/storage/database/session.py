@@ -1,8 +1,4 @@
-"""
-SQLAlchemy 异步数据库初始化
-
-提供异步引擎、会话工厂与会话获取函数。
-"""
+"""SQLAlchemy 异步数据库初始化。"""
 
 import logging
 from collections.abc import AsyncGenerator

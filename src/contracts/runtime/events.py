@@ -23,12 +23,21 @@ class _EventSchema(PydanticBaseModel):
 
 
 class RuntimeEventType(StrEnum):
-    """可持久化的模型生命周期事件类型。"""
+    """可持久化的 runtime 事实事件类型。"""
 
     MODEL_INVOCATION_STARTED = "model_invocation_started"
     MODEL_INVOCATION_COMPLETED = "model_invocation_completed"
     MODEL_INVOCATION_FAILED = "model_invocation_failed"
     MODEL_TOOL_CALLS_PRODUCED = "model_tool_calls_produced"
+    AGENT_RUN_STARTED = "agent_run_started"
+    AGENT_RUN_COMPLETED = "agent_run_completed"
+    AGENT_RUN_FAILED = "agent_run_failed"
+    AGENT_RUN_CANCELLED = "agent_run_cancelled"
+    PATTERN_SELECTED = "pattern_selected"
+    PATTERN_TRANSITIONED = "pattern_transitioned"
+    STEP_STARTED = "step_started"
+    STEP_COMPLETED = "step_completed"
+    TOOL_ACTION_EXECUTED = "tool_action_executed"
 
 
 class RuntimeActorType(StrEnum):
@@ -128,11 +137,113 @@ class ModelToolCallsProducedPayload(_EventSchema):
     calls: list[ProducedToolCallFact] = Field(min_length=1)
 
 
+class AgentRunStartedPayload(_EventSchema):
+    """AgentRun 开始执行的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    mode: str = Field(min_length=1)
+    pattern: str = Field(min_length=1)
+    context_message_sequence: int = Field(ge=1)
+    trace_id: str = Field(min_length=1)
+
+
+class AgentRunCompletedPayload(_EventSchema):
+    """AgentRun 成功完成的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    status: str = Field(pattern="^completed$")
+    finish_reason: str = Field(min_length=1)
+    step_count: int = Field(ge=0)
+    latency_ms: float = Field(ge=0)
+
+
+class AgentRunFailedPayload(_EventSchema):
+    """AgentRun 失败终止的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    status: str = Field(pattern="^failed$")
+    error_type: str = Field(min_length=1)
+    error_classification: str = Field(min_length=1)
+    last_step_sequence: int | None = Field(default=None, ge=1)
+    latency_ms: float = Field(ge=0)
+
+
+class AgentRunCancelledPayload(_EventSchema):
+    """AgentRun 被取消的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    status: str = Field(pattern="^cancelled$")
+    trigger: str = Field(pattern="^(explicit|sse_disconnect)$")
+    last_step_sequence: int | None = Field(default=None, ge=1)
+    latency_ms: float = Field(ge=0)
+
+
+class PatternSelectedPayload(_EventSchema):
+    """Pattern selector 完成选择的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    pattern: str = Field(min_length=1)
+    selection_source: str = Field(pattern="^(explicit|mode_default|fallback)$")
+    mode: str = Field(min_length=1)
+
+
+class PatternTransitionedPayload(_EventSchema):
+    """Pattern 转移的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    from_pattern: str = Field(min_length=1)
+    to_pattern: str = Field(min_length=1)
+    step_sequence: int = Field(ge=1)
+    reason: str = Field(min_length=1)
+
+
+class StepStartedPayload(_EventSchema):
+    """AgentRun step 开始执行的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    step_id: str = Field(min_length=1)
+    sequence: int = Field(ge=1)
+    kind: str = Field(pattern="^(model|tool|transition|complete|fail)$")
+    pattern: str = Field(min_length=1)
+
+
+class StepCompletedPayload(_EventSchema):
+    """AgentRun step 执行结束的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    step_id: str = Field(min_length=1)
+    sequence: int = Field(ge=1)
+    kind: str = Field(pattern="^(model|tool|transition|complete|fail)$")
+    status: str = Field(pattern="^(succeeded|failed|cancelled)$")
+    latency_ms: float = Field(ge=0)
+
+
+class ToolActionExecutedPayload(_EventSchema):
+    """工具动作完成的安全事实 payload。"""
+
+    agent_run_id: str = Field(min_length=1)
+    step_id: str = Field(min_length=1)
+    tool_name: str = Field(min_length=1)
+    call_id: str = Field(min_length=1)
+    status: str = Field(pattern="^(success|validation_failed|execution_failed)$")
+    latency_ms: float = Field(ge=0)
+
+
 type RuntimeEventPayload = (
     ModelInvocationStartedPayload
     | ModelInvocationCompletedPayload
     | ModelInvocationFailedPayload
     | ModelToolCallsProducedPayload
+    | AgentRunStartedPayload
+    | AgentRunCompletedPayload
+    | AgentRunFailedPayload
+    | AgentRunCancelledPayload
+    | PatternSelectedPayload
+    | PatternTransitionedPayload
+    | StepStartedPayload
+    | StepCompletedPayload
+    | ToolActionExecutedPayload
 )
 
 _PAYLOAD_BY_EVENT_TYPE: dict[RuntimeEventType, type[_EventSchema]] = {
@@ -140,6 +251,15 @@ _PAYLOAD_BY_EVENT_TYPE: dict[RuntimeEventType, type[_EventSchema]] = {
     RuntimeEventType.MODEL_INVOCATION_COMPLETED: ModelInvocationCompletedPayload,
     RuntimeEventType.MODEL_INVOCATION_FAILED: ModelInvocationFailedPayload,
     RuntimeEventType.MODEL_TOOL_CALLS_PRODUCED: ModelToolCallsProducedPayload,
+    RuntimeEventType.AGENT_RUN_STARTED: AgentRunStartedPayload,
+    RuntimeEventType.AGENT_RUN_COMPLETED: AgentRunCompletedPayload,
+    RuntimeEventType.AGENT_RUN_FAILED: AgentRunFailedPayload,
+    RuntimeEventType.AGENT_RUN_CANCELLED: AgentRunCancelledPayload,
+    RuntimeEventType.PATTERN_SELECTED: PatternSelectedPayload,
+    RuntimeEventType.PATTERN_TRANSITIONED: PatternTransitionedPayload,
+    RuntimeEventType.STEP_STARTED: StepStartedPayload,
+    RuntimeEventType.STEP_COMPLETED: StepCompletedPayload,
+    RuntimeEventType.TOOL_ACTION_EXECUTED: ToolActionExecutedPayload,
 }
 
 
@@ -196,12 +316,22 @@ class RuntimeEvent(_EventSchema):
 
 
 __all__ = [
+    "AgentRunCancelledPayload",
+    "AgentRunCompletedPayload",
+    "AgentRunFailedPayload",
+    "AgentRunStartedPayload",
     "ModelInvocationCompletedPayload",
     "ModelInvocationFailedPayload",
     "ModelInvocationStartedPayload",
     "ModelToolCallsProducedPayload",
+    "PatternSelectedPayload",
+    "PatternTransitionedPayload",
     "ProducedToolCallFact",
     "RuntimeActorType",
     "RuntimeEvent",
+    "RuntimeEventPayload",
     "RuntimeEventType",
+    "StepCompletedPayload",
+    "StepStartedPayload",
+    "ToolActionExecutedPayload",
 ]
