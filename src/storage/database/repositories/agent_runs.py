@@ -18,7 +18,6 @@ from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
 from src.core.utils import generate_uuid7
 from src.core.utils import utc_now
-from src.runtime.state_machine import ensure_transition
 from src.storage.database.models.agent_runs import AgentRunRecord
 from src.storage.database.models.agent_runs import AgentRunStepRecord
 
@@ -31,6 +30,27 @@ TERMINAL_RUN_STATUSES = frozenset(
     }
 )
 
+_ALLOWED_RUN_TRANSITIONS: dict[AgentRunStatus, frozenset[AgentRunStatus]] = {
+    AgentRunStatus.CREATED: frozenset(
+        {
+            AgentRunStatus.RUNNING,
+            AgentRunStatus.COMPLETED,
+            AgentRunStatus.FAILED,
+            AgentRunStatus.CANCELLED,
+        }
+    ),
+    AgentRunStatus.RUNNING: frozenset(
+        {
+            AgentRunStatus.COMPLETED,
+            AgentRunStatus.FAILED,
+            AgentRunStatus.CANCELLED,
+        }
+    ),
+    AgentRunStatus.COMPLETED: frozenset(),
+    AgentRunStatus.FAILED: frozenset(),
+    AgentRunStatus.CANCELLED: frozenset(),
+}
+
 
 def _uuid(value: str | UUID) -> UUID:
     return value if isinstance(value, UUID) else UUID(value)
@@ -38,6 +58,20 @@ def _uuid(value: str | UUID) -> UUID:
 
 def _new_uuid7() -> UUID:
     return UUID(generate_uuid7())
+
+
+def _ensure_run_transition(current: AgentRunStatus, target: AgentRunStatus) -> None:
+    """校验 AgentRun 持久化状态转换。
+
+    Args:
+        current: 当前状态。
+        target: 目标状态。
+
+    Raises:
+        ValueError: 状态转换非法。
+    """
+    if target not in _ALLOWED_RUN_TRANSITIONS[current]:
+        raise ValueError(f"非法 AgentRun 状态转换: {current.value} -> {target.value}")
 
 
 def _record_to_run(record: AgentRunRecord) -> AgentRun:
@@ -208,7 +242,7 @@ class AgentRunRepository:
         record = await self._load_run_record(agent_run_id, for_update=True)
         if record is None or record.status in TERMINAL_RUN_STATUSES:
             return None
-        ensure_transition(AgentRunStatus(record.status), status)
+        _ensure_run_transition(AgentRunStatus(record.status), status)
         record.status = status.value
         if status == AgentRunStatus.RUNNING and record.started_at is None:
             record.started_at = utc_now().replace(tzinfo=None)

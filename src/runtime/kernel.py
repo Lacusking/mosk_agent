@@ -51,7 +51,7 @@ from src.runtime.stream import output_text_delta_event
 from src.runtime.stream import run_started_event
 from src.runtime.stream import terminal_event
 from src.sessions import SessionManager
-from src.storage.database.repositories import RuntimeEventRepository
+from src.storage.database.repositories.events import RuntimeEventRepository
 from src.tools import ToolActionExecutor
 
 

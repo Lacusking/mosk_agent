@@ -9,7 +9,7 @@ from src.contracts.sessions import CreateSessionRequest
 from src.contracts.sessions import SessionMessagesResponse
 from src.contracts.sessions import SessionResponse
 from src.sessions import SessionManager
-from src.storage.database.repositories import SessionRepository
+from src.storage.database.repositories.sessions import SessionRepository
 
 router = APIRouter(dependencies=[InternalAuth])
 

@@ -3,6 +3,6 @@
 from src.agent_runs.manager import AgentRunManager
 from src.storage.database.models import AgentRunRecord
 from src.storage.database.models import AgentRunStepRecord
-from src.storage.database.repositories import AgentRunRepository
+from src.storage.database.repositories.agent_runs import AgentRunRepository
 
 __all__ = ["AgentRunManager", "AgentRunRecord", "AgentRunRepository", "AgentRunStepRecord"]

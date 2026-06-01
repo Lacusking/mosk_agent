@@ -12,7 +12,7 @@ from src.contracts.agent_runs import AgentRunStepStatus
 from src.core.config import AgentRuntimeConfig
 from src.core.utils import utc_now
 from src.exceptions import AgentRunConflictError
-from src.storage.database.repositories import AgentRunRepository
+from src.storage.database.repositories.agent_runs import AgentRunRepository
 
 
 class AgentRunManager:

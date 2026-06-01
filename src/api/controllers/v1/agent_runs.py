@@ -30,16 +30,16 @@ from src.runtime import CancellationTrigger
 from src.runtime import build_mock_model_invoker
 from src.runtime import format_sse
 from src.sessions import SessionManager
-from src.storage.database.repositories import AgentRunRepository
-from src.storage.database.repositories import RuntimeEventRepository
-from src.storage.database.repositories import SessionRepository
+from src.storage.database.repositories.agent_runs import AgentRunRepository
+from src.storage.database.repositories.events import RuntimeEventRepository
+from src.storage.database.repositories.sessions import SessionRepository
 from src.tools import MockToolActionExecutor
 
 router = APIRouter(dependencies=[InternalAuth])
 _cancellations = CancellationRegistry()
 
 
-@router.post("/agent-runs")
+@router.post("/agent-runs", response_model=None)
 async def create_agent_run(
     request: CreateAgentRunRequest,
     http_request: Request,
