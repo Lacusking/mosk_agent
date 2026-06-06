@@ -151,3 +151,25 @@ def test_config_exposes_model_transport_defaults(monkeypatch: pytest.MonkeyPatch
 
     assert config.OPENAI_TIMEOUT_SECONDS == 4.5
     assert config.OPENAI_BASE_URL.endswith("/v1")
+
+
+def test_model_profile_context_window_tokens_is_optional() -> None:
+    """ModelProfile 可声明 context window，也可保持默认空值。"""
+    profile = ModelProfile(
+        "openai:gpt-test",
+        "openai",
+        "gpt-test",
+        ModelProtocol.OPENAI_CHAT,
+        ModelCapabilities(),
+        context_window_tokens=128000,
+    )
+    default_profile = ModelProfile(
+        "mock:mock-model",
+        "mock",
+        "mock-model",
+        ModelProtocol.MOCK,
+        ModelCapabilities(),
+    )
+
+    assert profile.context_window_tokens == 128000
+    assert default_profile.context_window_tokens is None

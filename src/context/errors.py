@@ -15,4 +15,8 @@ class ContextStrategyError(ContextError):
     """上下文策略执行失败。"""
 
 
-__all__ = ["ContextConversionError", "ContextError", "ContextStrategyError"]
+class ContextBudgetError(ContextError):
+    """上下文无法满足 token 预算。"""
+
+
+__all__ = ["ContextBudgetError", "ContextConversionError", "ContextError", "ContextStrategyError"]

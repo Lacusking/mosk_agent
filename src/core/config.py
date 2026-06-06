@@ -107,6 +107,10 @@ class AgentRuntimeConfig(AppBaseSetting):
     CONTEXT_SNIP_THRESHOLD_MESSAGES: int = Field(default=30, gt=0)
     CONTEXT_SNIP_HEAD_MESSAGES: int = Field(default=2, ge=0)
     CONTEXT_SNIP_TAIL_MESSAGES: int = Field(default=8, ge=0)
+    CONTEXT_TOKEN_BUDGET: int = Field(default=32768, gt=0)
+    CONTEXT_TOKEN_RESERVE: int = Field(default=4096, ge=0)
+    CONTEXT_MICRO_ITEM_MAX_TOKENS: int = Field(default=4096, gt=0)
+    CONTEXT_TOOL_RESULT_BUDGET_TOKENS: int = Field(default=8192, gt=0)
 
     @field_validator("DEFAULT_AGENT_MODE")
     @classmethod
@@ -173,6 +177,12 @@ class AgentRuntimeConfig(AppBaseSetting):
             raise ValueError("CONTEXT_SNIP_HEAD_MESSAGES 与 CONTEXT_SNIP_TAIL_MESSAGES 之和不能超过阈值")
         if self.CONTEXT_SNIP_THRESHOLD_MESSAGES > self.CONTEXT_WINDOW_MESSAGES:
             raise ValueError("CONTEXT_SNIP_THRESHOLD_MESSAGES 不能大于 CONTEXT_WINDOW_MESSAGES")
+        if self.CONTEXT_TOKEN_RESERVE >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_TOKEN_RESERVE 必须小于 CONTEXT_TOKEN_BUDGET")
+        if self.CONTEXT_MICRO_ITEM_MAX_TOKENS >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_MICRO_ITEM_MAX_TOKENS 必须小于 CONTEXT_TOKEN_BUDGET")
+        if self.CONTEXT_TOOL_RESULT_BUDGET_TOKENS >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_TOOL_RESULT_BUDGET_TOKENS 必须小于 CONTEXT_TOKEN_BUDGET")
         return self
 
 

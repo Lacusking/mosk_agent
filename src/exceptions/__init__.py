@@ -11,6 +11,7 @@ from src.exceptions.models import ModelAuthenticationError
 from src.exceptions.models import ModelAuthorizationError
 from src.exceptions.models import ModelCapabilityError
 from src.exceptions.models import ModelConfigurationError
+from src.exceptions.models import ModelContextLengthError
 from src.exceptions.models import ModelError
 from src.exceptions.models import ModelInvalidRequestError
 from src.exceptions.models import ModelRateLimitError
@@ -31,6 +32,7 @@ __all__ = [
     "ModelAuthorizationError",
     "ModelCapabilityError",
     "ModelConfigurationError",
+    "ModelContextLengthError",
     "ModelError",
     "ModelInvalidRequestError",
     "ModelRateLimitError",

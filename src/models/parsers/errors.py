@@ -6,6 +6,7 @@ import httpx
 
 from src.exceptions import ModelAuthenticationError
 from src.exceptions import ModelAuthorizationError
+from src.exceptions import ModelContextLengthError
 from src.exceptions import ModelError
 from src.exceptions import ModelInvalidRequestError
 from src.exceptions import ModelRateLimitError
@@ -56,6 +57,14 @@ def map_provider_error(
         status = error.response.status_code
         code = _provider_error_code(error.response)
         fields = {**common, "provider_status_code": status, "provider_error_code": code}
+        if code == "context_length_exceeded":
+            token_info = _provider_token_info(error.response)
+            return ModelContextLengthError(
+                **fields,
+                prompt_tokens=token_info.get("prompt_tokens"),
+                max_context_tokens=token_info.get("max_context_tokens"),
+                cause=error,
+            )
         if status == 401:
             return ModelAuthenticationError(**fields, cause=error)
         if status == 403:
@@ -84,6 +93,15 @@ def map_provider_error(
 
 def _provider_error_code(response: httpx.Response) -> str | None:
     """读取 provider 返回的安全机器错误码。"""
+    error = _provider_error_body(response)
+    if error is None:
+        return None
+    code = error.get("code")
+    return str(code) if code is not None else None
+
+
+def _provider_error_body(response: httpx.Response) -> dict[str, Any] | None:
+    """读取 provider error 对象。"""
     try:
         parsed = response.json()
     except ValueError:
@@ -93,8 +111,34 @@ def _provider_error_code(response: httpx.Response) -> str | None:
     error = parsed.get("error")
     if not isinstance(error, dict):
         return None
-    code = error.get("code")
-    return str(code) if code is not None else None
+    return error
+
+
+def _provider_token_info(response: httpx.Response) -> dict[str, int | None]:
+    """从 provider error 中提取安全 token 诊断信息。"""
+    error = _provider_error_body(response) or {}
+    return {
+        "prompt_tokens": _as_int(
+            error.get("prompt_tokens")
+            or error.get("tokens")
+            or error.get("input_tokens")
+        ),
+        "max_context_tokens": _as_int(
+            error.get("max_context_tokens")
+            or error.get("context_window")
+            or error.get("max_tokens")
+        ),
+    }
+
+
+def _as_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
 
 
 def _retry_after(response: httpx.Response) -> float | None:

@@ -19,10 +19,16 @@ from src.contracts.agent_runs import AgentRunStep
 from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
 from src.contracts.patterns import CompleteAction
+from src.contracts.patterns import InvokeModelAction
 from src.contracts.patterns import InvokeToolAction
+from src.contracts.patterns import OutputVisibility
 from src.contracts.patterns import PatternRuntimeState
 from src.contracts.runtime import ModelMessage
+from src.contracts.runtime import ModelProtocol
+from src.contracts.runtime import ModelResponse
+from src.contracts.runtime import ModelResponseStatus
 from src.contracts.runtime import ModelRole
+from src.contracts.runtime import ModelStopReason
 from src.contracts.runtime import ModelStreamEvent
 from src.contracts.runtime import ModelToolCall
 from src.contracts.runtime import TextContentBlock
@@ -30,6 +36,7 @@ from src.contracts.tools import ToolActionRequest
 from src.contracts.tools import ToolActionResult
 from src.contracts.tools import ToolActionStatus
 from src.core.config import AgentRuntimeConfig
+from src.exceptions import ModelContextLengthError
 from src.runtime import AgentRunExecutionResult
 from src.runtime import AgentRuntimeKernel
 
@@ -77,14 +84,33 @@ def _bundle(message: ModelMessage | None = None) -> ContextBundle:
     )
 
 
+def _bundle_many(count: int) -> ContextBundle:
+    return ContextBundle(
+        agent_run_id="run-1",
+        session_id="session-1",
+        session_messages=[
+            ContextItem(
+                source=ContextSource.SESSION,
+                type=ContextItemType.MESSAGE,
+                content=_message(f"context {index}"),
+                metadata={"sequence": index},
+            )
+            for index in range(1, count + 1)
+        ],
+    )
+
+
 class _ContextBuilder:
     def __init__(self, bundle: ContextBundle | None = None, error: Exception | None = None) -> None:
         self.bundle = bundle or _bundle()
         self.error = error
         self.calls: list[str] = []
+        self.observation_counts: list[int] = []
 
-    async def build(self, agent_run: AgentRun) -> ContextBundle:
+    async def build(self, agent_run: AgentRun, **kwargs: object) -> ContextBundle:
         self.calls.append(agent_run.agent_run_id)
+        observations = kwargs.get("observations")
+        self.observation_counts.append(len(observations) if isinstance(observations, list) else 0)
         if self.error:
             raise self.error
         return self.bundle
@@ -196,6 +222,32 @@ class _ModelInvoker:
         raise AssertionError("model stream should not be invoked in this test")
 
 
+class _ContextReductionModelInvoker:
+    def __init__(self) -> None:
+        self.requests: list[object] = []
+
+    async def invoke(self, request) -> ModelResponse:
+        self.requests.append(request)
+        if len(self.requests) == 1:
+            raise ModelContextLengthError(
+                provider="mock",
+                model="mock-model",
+                protocol=ModelProtocol.MOCK.value,
+            )
+        return ModelResponse(
+            invocation_id=request.invocation_id,
+            provider="mock",
+            model="mock-model",
+            protocol=ModelProtocol.MOCK,
+            content=[TextContentBlock(text="ok")],
+            status=ModelResponseStatus.COMPLETED,
+            stop_reason=ModelStopReason.COMPLETED,
+        )
+
+    def stream(self, request) -> AsyncIterator[ModelStreamEvent]:
+        raise AssertionError("test uses blocking invoke")
+
+
 class _ToolExecutor:
     def __init__(self) -> None:
         self.requests: list[ToolActionRequest] = []
@@ -244,16 +296,34 @@ class _ObservationPattern:
         return CompleteAction(final_content="done after tool")
 
 
-def _kernel(*, pattern, context_builder, session_manager=None, tool_executor=None):
+class _ModelThenCompletePattern:
+    def next_action(self, state: PatternRuntimeState):
+        if not state.observations:
+            return InvokeModelAction(
+                messages=state.visible_context_messages,
+                output_visibility=OutputVisibility.INTERNAL,
+            )
+        return CompleteAction(final_content="done after model")
+
+
+def _kernel(
+    *,
+    pattern,
+    context_builder,
+    session_manager=None,
+    tool_executor=None,
+    model_invoker=None,
+    config=None,
+):
     return AgentRuntimeKernel(
         patterns=_Registry(pattern),
         run_manager=_RunManager(),
         session_manager=session_manager or _SessionManager(),
         context_builder=context_builder,
         event_repository=_EventRepository(),
-        model_invoker=_ModelInvoker(),
+        model_invoker=model_invoker or _ModelInvoker(),
         tool_executor=tool_executor or _ToolExecutor(),
-        config=AgentRuntimeConfig(),
+        config=config or AgentRuntimeConfig(),
     )
 
 
@@ -297,18 +367,45 @@ async def test_kernel_observation_keeps_tool_result_in_pattern_state() -> None:
     """工具 observation 留在 PatternRuntimeState.observations 中。"""
     pattern = _ObservationPattern()
     tool_executor = _ToolExecutor()
+    context_builder = _ContextBuilder()
 
     result = await _consume_result(
         _kernel(
             pattern=pattern,
-            context_builder=_ContextBuilder(),
+            context_builder=context_builder,
             tool_executor=tool_executor,
         )
     )
 
     assert pattern.observations_seen == [[], ["tool_result"]]
+    assert context_builder.observation_counts == [0, 1]
     assert tool_executor.requests[0].name == "mock.echo"
     assert result.final_content == "done after tool"
+
+
+@pytest.mark.asyncio
+async def test_kernel_context_length_error_retries_with_reduced_messages() -> None:
+    """模型上下文超限时 kernel 缩减消息后重试一次。"""
+    invoker = _ContextReductionModelInvoker()
+    kernel = _kernel(
+        pattern=_ModelThenCompletePattern(),
+        context_builder=_ContextBuilder(_bundle_many(6)),
+        model_invoker=invoker,
+        config=AgentRuntimeConfig(
+            CONTEXT_WINDOW_MESSAGES=6,
+            CONTEXT_SNIP_THRESHOLD_MESSAGES=3,
+            CONTEXT_SNIP_HEAD_MESSAGES=1,
+            CONTEXT_SNIP_TAIL_MESSAGES=2,
+        ),
+    )
+
+    result = await kernel.execute(_agent_run())
+
+    assert result.final_content == "done after model"
+    assert len(invoker.requests) == 2
+    assert len(invoker.requests[0].messages) == 6
+    assert len(invoker.requests[1].messages) == 1
+    assert invoker.requests[1].metadata["context_reduction_retry"] is True
 
 
 async def _consume_result(kernel: AgentRuntimeKernel) -> AgentRunExecutionResult:

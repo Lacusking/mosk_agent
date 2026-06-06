@@ -61,6 +61,9 @@ class TestConfig:
         assert config.AGENT_RUN_TIMEOUT_SECONDS == 120
         assert config.AGENT_RUN_MODEL_RETRY_LIMIT == 1
         assert config.ENABLE_MOCK_TOOL_ACTIONS is True
+        assert config.CONTEXT_TOKEN_BUDGET > config.CONTEXT_TOKEN_RESERVE
+        assert config.CONTEXT_MICRO_ITEM_MAX_TOKENS < config.CONTEXT_TOKEN_BUDGET
+        assert config.CONTEXT_TOOL_RESULT_BUDGET_TOKENS < config.CONTEXT_TOKEN_BUDGET
 
     def test_agent_runtime_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """环境变量可以覆盖 Agent runtime 运行限制。"""
@@ -87,6 +90,7 @@ class TestConfig:
             ("DEFAULT_BUILD_PATTERN", "unknown", "默认 pattern"),
             ("AGENT_RUN_MAX_STEPS", "0", "greater than 0"),
             ("AGENT_RUN_MODEL_RETRY_LIMIT", "-1", "greater than or equal to 0"),
+            ("CONTEXT_TOKEN_RESERVE", "32768", "CONTEXT_TOKEN_RESERVE"),
         ],
     )
     def test_agent_runtime_rejects_invalid_config(

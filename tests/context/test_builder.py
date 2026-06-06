@@ -5,12 +5,15 @@ from datetime import datetime
 
 import pytest
 
+from src.context import ContextBudgetError
 from src.context import ContextBuilder
 from src.context import ContextStrategyPipeline
 from src.contracts.agent_runs import AgentMode
 from src.contracts.agent_runs import AgentRun
 from src.contracts.agent_runs import AgentRunStatus
+from src.contracts.patterns import PatternObservation
 from src.contracts.runtime import TextContentBlock
+from src.contracts.runtime import ToolResultContentBlock
 from src.contracts.sessions import SessionMessage
 from src.contracts.sessions import SessionMessageRole
 from src.core.config import AgentRuntimeConfig
@@ -53,6 +56,32 @@ def _session_message(sequence: int) -> SessionMessage:
         sequence=sequence,
         role=SessionMessageRole.USER,
         content=[TextContentBlock(text=f"hello {sequence}")],
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _session_message_with_text(sequence: int, text: str) -> SessionMessage:
+    now = datetime.now(UTC)
+    return SessionMessage(
+        message_id=f"message-{sequence}",
+        session_id="session-1",
+        sequence=sequence,
+        role=SessionMessageRole.USER,
+        content=[TextContentBlock(text=text)],
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _session_tool_result_message(sequence: int, call_id: str) -> SessionMessage:
+    now = datetime.now(UTC)
+    return SessionMessage(
+        message_id=f"message-{sequence}",
+        session_id="session-1",
+        sequence=sequence,
+        role=SessionMessageRole.ASSISTANT,
+        content=[ToolResultContentBlock(call_id=call_id, output={"value": "persisted"})],
         created_at=now,
         updated_at=now,
     )
@@ -127,3 +156,121 @@ async def test_builder_pipeline_can_compact_context() -> None:
     ).build(_agent_run())
 
     assert [item.sequence for item in bundle.session_messages] == [1, 8, 9, 10]
+
+
+@pytest.mark.asyncio
+async def test_builder_observation_adds_successful_tool_result_to_context() -> None:
+    """成功的 tool_result observation 会进入 ContextBundle.tool_observations。"""
+    manager = _FakeSessionManager([_session_message(1)])
+    builder = ContextBuilder(
+        session_manager=manager,  # type: ignore[arg-type]
+        config=AgentRuntimeConfig(),
+        pipeline=ContextStrategyPipeline(),
+    )
+
+    bundle = await builder.build(
+        _agent_run(),
+        observations=[
+            PatternObservation(
+                kind="tool_result",
+                data={
+                    "call_id": "call-1",
+                    "name": "mock.echo",
+                    "status": "success",
+                    "observation": {"value": "ok"},
+                    "is_error": False,
+                },
+            )
+        ],
+    )
+
+    assert [item.metadata["call_id"] for item in bundle.tool_observations] == ["call-1"]
+    message = bundle.to_model_messages()[-1]
+    assert isinstance(message.content[0], ToolResultContentBlock)
+    assert message.content[0].call_id == "call-1"
+
+
+@pytest.mark.asyncio
+async def test_builder_observation_skips_failed_tool_result() -> None:
+    """失败的 tool_result observation 不装配到模型上下文。"""
+    manager = _FakeSessionManager([_session_message(1)])
+    builder = ContextBuilder(
+        session_manager=manager,  # type: ignore[arg-type]
+        config=AgentRuntimeConfig(),
+        pipeline=ContextStrategyPipeline(),
+    )
+
+    bundle = await builder.build(
+        _agent_run(),
+        observations=[
+            PatternObservation(
+                kind="tool_result",
+                data={
+                    "call_id": "call-1",
+                    "name": "mock.echo",
+                    "status": "error",
+                    "observation": {"error": "bad"},
+                    "is_error": True,
+                },
+            )
+        ],
+    )
+
+    assert bundle.tool_observations == []
+
+
+@pytest.mark.asyncio
+async def test_builder_observation_deduplicates_existing_tool_result_call_id() -> None:
+    """session 中已有同 call_id 的 tool_result 时不重复注入 observation。"""
+    manager = _FakeSessionManager([_session_tool_result_message(1, "call-1")])
+    builder = ContextBuilder(
+        session_manager=manager,  # type: ignore[arg-type]
+        config=AgentRuntimeConfig(),
+        pipeline=ContextStrategyPipeline(),
+    )
+
+    bundle = await builder.build(
+        _agent_run(),
+        observations=[
+            PatternObservation(
+                kind="tool_result",
+                data={
+                    "call_id": "call-1",
+                    "name": "mock.echo",
+                    "status": "success",
+                    "observation": {"value": "ok"},
+                    "is_error": False,
+                },
+            )
+        ],
+    )
+
+    assert bundle.tool_observations == []
+    messages = bundle.to_model_messages()
+    tool_result_blocks = [
+        block
+        for message in messages
+        for block in message.content
+        if isinstance(block, ToolResultContentBlock)
+    ]
+    assert [block.call_id for block in tool_result_blocks] == ["call-1"]
+
+
+@pytest.mark.asyncio
+async def test_builder_token_budget_failure_is_diagnostic() -> None:
+    """最小上下文仍超预算时 builder 抛出 ContextBudgetError。"""
+    manager = _FakeSessionManager([_session_message_with_text(1, "x" * 200)])
+    config = AgentRuntimeConfig(
+        CONTEXT_TOKEN_BUDGET=10,
+        CONTEXT_TOKEN_RESERVE=1,
+        CONTEXT_MICRO_ITEM_MAX_TOKENS=2,
+        CONTEXT_TOOL_RESULT_BUDGET_TOKENS=2,
+    )
+    builder = ContextBuilder(
+        session_manager=manager,  # type: ignore[arg-type]
+        config=config,
+        pipeline=ContextStrategyPipeline(),
+    )
+
+    with pytest.raises(ContextBudgetError):
+        await builder.build(_agent_run())

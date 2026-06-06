@@ -30,34 +30,34 @@
 
 ## 6. Token 计数与预算（src/context, src/models, src/core）
 
-- [ ] 6.1 [02-token-budget-and-counting][src/context] 定义 `TokenCounter` 协议与 `DefaultTokenCounter`（字符长度估算），实现 `count`/`count_message`/`count_messages` 方法；验证：`pytest -q tests/context -k token_counter`。
-- [ ] 6.2 [02-token-budget-and-counting][src/context] 可选实现 `TiktokenCounter` 适配器，依赖 tiktoken 包时启用；验证：`pytest -q tests/context -k tiktoken`。
-- [ ] 6.3 [02-token-budget-and-counting][src/models] 为 `ModelProfile` 增加 `context_window_tokens: int | None` 字段，不破坏现有 profile 注册；验证：`pytest -q tests/models -k profile`。
-- [ ] 6.4 [02-token-budget-and-counting][src/context] 在 ContextBuilder 中实现预飞行 token 校验：装配后计算 token 总量，与 profile context window 或全局默认预算比较；超预算时触发 token 级裁剪；验证：`pytest -q tests/context -k "preflight or token_budget"`。
-- [ ] 6.5 [02-token-budget-and-counting][src/core] 增加 `CONTEXT_TOKEN_BUDGET`、`CONTEXT_TOKEN_RESERVE` 配置项及校验；验证：`pytest -q tests/core -k "token or context"`。
+- [x] 6.1 [02-token-budget-and-counting][src/context] 定义 `TokenCounter` 协议与 `DefaultTokenCounter`（字符长度估算），实现 `count`/`count_message`/`count_messages` 方法；验证：`pytest -q tests/context -k token_counter`。
+- [x] 6.2 [02-token-budget-and-counting][src/context] 可选实现 `TiktokenCounter` 适配器，依赖 tiktoken 包时启用；验证：`pytest -q tests/context -k tiktoken`。
+- [x] 6.3 [02-token-budget-and-counting][src/models] 为 `ModelProfile` 增加 `context_window_tokens: int | None` 字段，不破坏现有 profile 注册；验证：`pytest -q tests/models -k profile`。
+- [x] 6.4 [02-token-budget-and-counting][src/context] 在 ContextBuilder 中实现预飞行 token 校验：装配后计算 token 总量，与 profile context window 或全局默认预算比较；超预算时触发 token 级裁剪；验证：`pytest -q tests/context -k "preflight or token_budget"`。
+- [x] 6.5 [02-token-budget-and-counting][src/core] 增加 `CONTEXT_TOKEN_BUDGET`、`CONTEXT_TOKEN_RESERVE` 配置项及校验；验证：`pytest -q tests/core -k "token or context"`。
 
 ## 7. 进阶压缩策略（src/context）
 
-- [ ] 7.1 [03-advanced-compact-strategies][src/context] 实现 microCompact 策略：截断超过 token 上限的单个 ContextItem 内容，保留首尾片段；验证：`pytest -q tests/context -k micro_compact`。
-- [ ] 7.2 [03-advanced-compact-strategies][src/context] 实现 toolResultBudget 策略：限制 tool observation items 的 token 总量，超出时按优先级和时间裁剪；验证：`pytest -q tests/context -k tool_result_budget`。
-- [ ] 7.3 [03-advanced-compact-strategies][src/context] 实现 autoCompact 策略：调用 LLM 将被驱逐内容压缩为临时摘要 ContextItem，失败时回退到无摘要裁剪；验证：`pytest -q tests/context -k auto_compact`。
-- [ ] 7.4 [03-advanced-compact-strategies][src/context] 将 microCompact 和 toolResultBudget 接入默认 pipeline，autoCompact 默认关闭；验证：`pytest -q tests/context -k "pipeline and compact"`。
+- [x] 7.1 [03-advanced-compact-strategies][src/context] 实现 microCompact 策略：截断超过 token 上限的单个 ContextItem 内容，保留首尾片段；验证：`pytest -q tests/context -k micro_compact`。
+- [x] 7.2 [03-advanced-compact-strategies][src/context] 实现 toolResultBudget 策略：限制 tool observation items 的 token 总量，超出时按优先级和时间裁剪；验证：`pytest -q tests/context -k tool_result_budget`。
+- [x] 7.3 [03-advanced-compact-strategies][src/context] 实现 autoCompact 策略：调用 LLM 将被驱逐内容压缩为临时摘要 ContextItem，失败时回退到无摘要裁剪；验证：`pytest -q tests/context -k auto_compact`。
+- [x] 7.4 [03-advanced-compact-strategies][src/context] 将 microCompact 和 toolResultBudget 接入默认 pipeline，autoCompact 默认关闭；验证：`pytest -q tests/context -k "pipeline and compact"`。
 
 ## 8. Observation 上下文装配（src/context, src/runtime）
 
-- [ ] 8.1 [04-observation-context-assembly][src/context] 在 ContextBuilder 中实现从 PatternRuntimeState.observations 提取已完成 tool_result，转换为 ContextItem 并装配到 ContextBundle.tool_observations；验证：`pytest -q tests/context -k observation`。
-- [ ] 8.2 [04-observation-context-assembly][src/context] 实现以 call_id 为标识的去重逻辑，避免同一 observation 在模型消息中重复出现；验证：`pytest -q tests/context -k "observation and dedup"`。
-- [ ] 8.3 [04-observation-context-assembly][src/runtime] 确认 pattern 仍从 PatternRuntimeState.observations 读取动作决策信息，不依赖 ContextBundle；验证：`pytest -q tests/runtime -k "react or observation"`。
+- [x] 8.1 [04-observation-context-assembly][src/context] 在 ContextBuilder 中实现从 PatternRuntimeState.observations 提取已完成 tool_result，转换为 ContextItem 并装配到 ContextBundle.tool_observations；验证：`pytest -q tests/context -k observation`。
+- [x] 8.2 [04-observation-context-assembly][src/context] 实现以 call_id 为标识的去重逻辑，避免同一 observation 在模型消息中重复出现；验证：`pytest -q tests/context -k "observation and dedup"`。
+- [x] 8.3 [04-observation-context-assembly][src/runtime] 确认 pattern 仍从 PatternRuntimeState.observations 读取动作决策信息，不依赖 ContextBundle；验证：`pytest -q tests/runtime -k "react or observation"`。
 
 ## 9. 响应式上下文恢复（src/exceptions, src/models, src/runtime）
 
-- [ ] 9.1 [05-reactive-context-recovery][src/exceptions] 新增 `ModelContextLengthError` 异常类型，标记 `retryable=True`，携带 `provider_reported_tokens` 字段；验证：`pytest -q tests/exceptions -k context_length`。
-- [ ] 9.2 [05-reactive-context-recovery][src/models] 在 OpenAI error parser 中将 413/context_length_exceeded 映射为 `ModelContextLengthError`；验证：`pytest -q tests/models -k "context_length or error"`。
-- [ ] 9.3 [05-reactive-context-recovery][src/runtime] 在 `decide_model_error()` 中增加 `ModelContextLengthError` 识别分支，返回 `context_reduction_retry` 决策；验证：`pytest -q tests/runtime -k "error_policy and context"`。
-- [ ] 9.4 [05-reactive-context-recovery][src/runtime] 在 kernel `_call_model()` 中实现渐进缩减重试：降低 snip 阈值 + 启用 microCompact，最多一次缩减重试；验证：`pytest -q tests/runtime -k "context_reduction or reactive"`。
+- [x] 9.1 [05-reactive-context-recovery][src/exceptions] 新增 `ModelContextLengthError` 异常类型，标记 `retryable=True`，携带 `provider_reported_tokens` 字段；验证：`pytest -q tests/exceptions -k context_length`。
+- [x] 9.2 [05-reactive-context-recovery][src/models] 在 OpenAI error parser 中将 413/context_length_exceeded 映射为 `ModelContextLengthError`；验证：`pytest -q tests/models -k "context_length or error"`。
+- [x] 9.3 [05-reactive-context-recovery][src/runtime] 在 `decide_model_error()` 中增加 `ModelContextLengthError` 识别分支，返回 `context_reduction_retry` 决策；验证：`pytest -q tests/runtime -k "error_policy and context"`。
+- [x] 9.4 [05-reactive-context-recovery][src/runtime] 在 kernel `_call_model()` 中实现渐进缩减重试：降低 snip 阈值 + 启用 microCompact，最多一次缩减重试；验证：`pytest -q tests/runtime -k "context_reduction or reactive"`。
 
 ## 10. 扩展验收与质量（testing, docs）
 
-- [ ] 10.1 [02-05][testing] 增加 token 预算、压缩策略、observation 装配与响应式恢复的集成测试覆盖；验证：`pytest -q tests/integration -k "token or compact or observation or context_recovery"`。
-- [ ] 10.2 [02-05][docs] 更新架构/结构文档，说明 TokenCounter、压缩策略链、observation 装配边界与响应式恢复流程；验证：人工检查文档一致性。
-- [ ] 10.3 [02-05][testing] 执行全量质量检查；验证：`ruff check src tests && pytest -q`。
+- [x] 10.1 [02-05][testing] 增加 token 预算、压缩策略、observation 装配与响应式恢复的集成测试覆盖；验证：`pytest -q tests/integration -k "token or compact or observation or context_recovery"`。
+- [x] 10.2 [02-05][docs] 更新架构/结构文档，说明 TokenCounter、压缩策略链、observation 装配边界与响应式恢复流程；验证：人工检查文档一致性。
+- [x] 10.3 [02-05][testing] 执行全量质量检查；验证：`ruff check src tests && pytest -q`。

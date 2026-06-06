@@ -27,6 +27,7 @@ from src.contracts.runtime import ContentDeltaPayload
 from src.contracts.runtime import ModelInvocationCompletedPayload
 from src.contracts.runtime import ModelInvocationFailedPayload
 from src.contracts.runtime import ModelInvocationStartedPayload
+from src.contracts.runtime import ModelMessage
 from src.contracts.runtime import ModelProtocol
 from src.contracts.runtime import ModelRequest
 from src.contracts.runtime import ModelResponse
@@ -171,11 +172,14 @@ class AgentRuntimeKernel:
         step_count = 0
 
         try:
-            context_bundle = await self._context_builder.build(current_run)
-            context = context_bundle.to_model_messages()
             while step_count < current_run.max_steps:
                 if cancellation_token:
                     cancellation_token.raise_if_cancelled()
+                context_bundle = await self._context_builder.build(
+                    current_run,
+                    observations=observations,
+                )
+                context = context_bundle.to_model_messages()
                 pattern = self._patterns.require(current_run.active_pattern)
                 state = PatternRuntimeState(
                     agent_run=current_run,
@@ -482,6 +486,12 @@ class AgentRuntimeKernel:
                 await self._append_model_failed(agent_run, step, request.invocation_id, exc)
                 if not decision.retry:
                     raise
+                if decision.context_reduction_retry:
+                    request = _context_reduced_request(
+                        request,
+                        tail_messages=max(1, self._config.CONTEXT_SNIP_TAIL_MESSAGES // 2),
+                        max_text_chars=max(64, self._config.CONTEXT_MICRO_ITEM_MAX_TOKENS * 2),
+                    )
                 retry_count += 1
 
     async def _execute_tool_action(
@@ -865,6 +875,51 @@ def _response_text(response: ModelResponse) -> str:
 
 def _latency_ms(started_at: float) -> float:
     return max(0.0, (monotonic() - started_at) * 1000)
+
+
+def _context_reduced_request(
+    request: ModelRequest,
+    *,
+    tail_messages: int,
+    max_text_chars: int,
+) -> ModelRequest:
+    system_messages = [
+        message
+        for message in request.messages
+        if message.role.value in {"system", "developer"}
+    ][:1]
+    tail = request.messages[-tail_messages:]
+    reduced = [*_dedupe_messages(system_messages, tail), *tail]
+    return request.model_copy(
+        update={
+            "messages": [_truncate_message(message, max_text_chars=max_text_chars) for message in reduced],
+            "metadata": {
+                **request.metadata,
+                "context_reduction_retry": True,
+                "context_reduction_original_messages": len(request.messages),
+                "context_reduction_messages": len(reduced),
+            },
+        }
+    )
+
+
+def _dedupe_messages(
+    protected: list[ModelMessage],
+    tail: list[ModelMessage],
+) -> list[ModelMessage]:
+    return [message for message in protected if message not in tail]
+
+
+def _truncate_message(message: ModelMessage, *, max_text_chars: int) -> ModelMessage:
+    blocks = []
+    for block in message.content:
+        if isinstance(block, TextContentBlock) and len(block.text) > max_text_chars:
+            half = max(1, max_text_chars // 2)
+            text = f"{block.text[:half]}\n...[snipped for context retry]...\n{block.text[-half:]}"
+            blocks.append(block.model_copy(update={"text": text}))
+        else:
+            blocks.append(block)
+    return message.model_copy(update={"content": blocks})
 
 
 __all__ = ["AgentRunExecutionResult", "AgentRuntimeKernel"]

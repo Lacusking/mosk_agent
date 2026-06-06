@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from src.exceptions import ModelContextLengthError
 from src.exceptions import ModelError
 from src.exceptions import ModelStreamInterruptedError
 
@@ -13,6 +14,7 @@ class ModelErrorDecision:
     retry: bool
     fail_run: bool
     error_type: str
+    context_reduction_retry: bool = False
 
 
 def decide_model_error(
@@ -38,6 +40,14 @@ def decide_model_error(
             retry=False,
             fail_run=True,
             error_type=error.__class__.__name__,
+        )
+    if isinstance(error, ModelContextLengthError):
+        can_reduce = not visible_output_sent and retry_count == 0
+        return ModelErrorDecision(
+            retry=can_reduce,
+            fail_run=not can_reduce,
+            error_type=error.__class__.__name__,
+            context_reduction_retry=can_reduce,
         )
     can_retry = error.retryable and not visible_output_sent and retry_count < retry_limit
     return ModelErrorDecision(

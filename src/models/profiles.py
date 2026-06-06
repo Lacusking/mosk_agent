@@ -17,3 +17,4 @@ class ModelProfile:
     protocol: ModelProtocol
     capabilities: ModelCapabilities
     allowed_options: frozenset[str] = field(default_factory=frozenset)
+    context_window_tokens: int | None = None

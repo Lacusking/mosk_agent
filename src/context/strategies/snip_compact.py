@@ -60,12 +60,19 @@ class SnipCompactStrategy:
                 break
             keep_indexes.add(index)
 
-        compacted = [
-            item
-            for index, item in enumerate(messages)
-            if index in keep_indexes or not _can_evict(item)
-        ]
-        return bundle.model_copy(update={"session_messages": compacted})
+        compacted: list[ContextItem] = []
+        evicted: list[ContextItem] = []
+        for index, item in enumerate(messages):
+            if index in keep_indexes or not _can_evict(item):
+                compacted.append(item)
+            else:
+                evicted.append(item)
+        return bundle.model_copy(
+            update={
+                "session_messages": compacted,
+                "evicted_items": [*bundle.evicted_items, *evicted],
+            }
+        )
 
     def _protected_indexes(self, messages: list[ContextItem]) -> set[int]:
         indexes = set(range(min(self._head_messages, len(messages))))

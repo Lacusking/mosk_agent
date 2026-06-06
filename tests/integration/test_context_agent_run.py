@@ -14,13 +14,17 @@ from src.contracts.agent_runs import AgentRunStep
 from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
 from src.contracts.patterns import CompleteAction
+from src.contracts.patterns import PatternObservation
 from src.contracts.patterns import PatternRuntimeState
 from src.contracts.runtime import TextContentBlock
+from src.contracts.runtime import ToolResultContentBlock
 from src.contracts.sessions import SessionMessage
 from src.contracts.sessions import SessionMessageRole
 from src.core.config import AgentRuntimeConfig
+from src.exceptions import ModelContextLengthError
 from src.runtime import AgentRunExecutionResult
 from src.runtime import AgentRuntimeKernel
+from src.runtime.error_policy import decide_model_error
 
 
 def _now() -> datetime:
@@ -226,3 +230,68 @@ async def test_context_agent_run_window_watermark_and_final_submission() -> None
     assert pattern.visible_texts == ["message 7", "message 8", "message 9", "message 10"]
     assert "message 11" not in pattern.visible_texts
     assert session_manager.final_messages == ["final answer"]
+
+
+@pytest.mark.asyncio
+async def test_token_compact_observation_context_integration() -> None:
+    """默认 context pipeline 同时处理 token、compact 与 observation 装配。"""
+    session_manager = _SessionManager()
+    session_manager.messages = [
+        _session_message(sequence).model_copy(
+            update={"content": [TextContentBlock(text=f"message {sequence} " + "x" * 80)]}
+        )
+        for sequence in range(1, 9)
+    ]
+    config = AgentRuntimeConfig(
+        CONTEXT_WINDOW_MESSAGES=8,
+        CONTEXT_SNIP_THRESHOLD_MESSAGES=4,
+        CONTEXT_SNIP_HEAD_MESSAGES=1,
+        CONTEXT_SNIP_TAIL_MESSAGES=2,
+        CONTEXT_TOKEN_BUDGET=160,
+        CONTEXT_TOKEN_RESERVE=20,
+        CONTEXT_MICRO_ITEM_MAX_TOKENS=16,
+        CONTEXT_TOOL_RESULT_BUDGET_TOKENS=24,
+    )
+    builder = ContextBuilder(
+        session_manager=session_manager,  # type: ignore[arg-type]
+        config=config,
+    )
+
+    bundle = await builder.build(
+        _agent_run(),
+        observations=[
+            PatternObservation(
+                kind="tool_result",
+                data={
+                    "call_id": "call-1",
+                    "name": "mock.lookup",
+                    "status": "success",
+                    "observation": "lookup result " + "y" * 120,
+                    "is_error": False,
+                },
+            )
+        ],
+    )
+
+    assert len(bundle.session_messages) <= config.CONTEXT_SNIP_THRESHOLD_MESSAGES
+    assert bundle.budget is not None
+    assert bundle.budget.used_tokens <= config.CONTEXT_TOKEN_BUDGET - config.CONTEXT_TOKEN_RESERVE
+    assert [item.metadata["call_id"] for item in bundle.tool_observations] == ["call-1"]
+    assert any(
+        isinstance(block, ToolResultContentBlock)
+        for message in bundle.to_model_messages()
+        for block in message.content
+    )
+
+
+def test_context_recovery_policy_integration() -> None:
+    """上下文超限错误进入 runtime 恢复决策。"""
+    decision = decide_model_error(
+        ModelContextLengthError(prompt_tokens=150000, max_context_tokens=128000),
+        retry_count=0,
+        retry_limit=1,
+        visible_output_sent=False,
+    )
+
+    assert decision.context_reduction_retry is True
+    assert decision.retry is True

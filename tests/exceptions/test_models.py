@@ -4,6 +4,7 @@ import pytest
 
 from src.exceptions import ModelAuthenticationError
 from src.exceptions import ModelCapabilityError
+from src.exceptions import ModelContextLengthError
 from src.exceptions import ModelError
 from src.exceptions import ModelRateLimitError
 from src.exceptions import ModelStreamInterruptedError
@@ -63,6 +64,21 @@ class TestModelErrors:
 
         assert err.data["details"]["partial_content_received"] is True
         assert err.data["details"]["pending_tool_call"] is True
+
+    def test_context_length_error_is_retryable_with_provider_tokens(self) -> None:
+        err = ModelContextLengthError(
+            provider="openai",
+            model="gpt-test",
+            protocol="openai_chat",
+            prompt_tokens=150000,
+            max_context_tokens=128000,
+        )
+
+        assert err.retryable is True
+        assert err.data["details"]["provider_reported_tokens"] == {
+            "prompt_tokens": 150000,
+            "max_context_tokens": 128000,
+        }
 
     def test_sensitive_data_is_redacted_recursively(self) -> None:
         err = ModelAuthenticationError(

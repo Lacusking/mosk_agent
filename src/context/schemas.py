@@ -11,6 +11,9 @@ from pydantic import model_validator
 from src.context.errors import ContextConversionError
 from src.contracts.runtime import JsonValue
 from src.contracts.runtime import ModelMessage
+from src.contracts.runtime import ModelRole
+from src.contracts.runtime import TextContentBlock
+from src.contracts.runtime import ToolResultContentBlock
 
 _SENSITIVE_METADATA_KEYS = frozenset(
     {
@@ -60,6 +63,11 @@ class ContextBudget(_ContextSchema):
     snip_threshold_messages: int | None = Field(default=None, gt=0)
     snip_head_messages: int = Field(default=0, ge=0)
     snip_tail_messages: int = Field(default=0, ge=0)
+    max_tokens: int | None = Field(default=None, gt=0)
+    token_reserve: int = Field(default=0, ge=0)
+    used_tokens: int = Field(default=0, ge=0)
+    tool_result_budget_tokens: int | None = Field(default=None, gt=0)
+    micro_item_max_tokens: int | None = Field(default=None, gt=0)
 
 
 type ContextContent = Annotated[ModelMessage | dict[str, JsonValue], Field(discriminator=None)]
@@ -118,7 +126,9 @@ class ContextBundle(_ContextSchema):
     memory_summary: ContextItem | None = None
     tool_observations: list[ContextItem] = Field(default_factory=list)
     artifacts: list[ContextItem] = Field(default_factory=list)
+    evicted_items: list[ContextItem] = Field(default_factory=list)
     budget: ContextBudget | None = None
+    diagnostics: dict[str, JsonValue] = Field(default_factory=dict)
 
     def to_model_messages(self) -> list[ModelMessage]:
         """提取可交给 pattern/model 的模型消息视图。
@@ -134,11 +144,49 @@ class ContextBundle(_ContextSchema):
             key=lambda item: item.sequence if item.sequence is not None else 0,
         )
         messages: list[ModelMessage] = []
+        if self.memory_summary is not None:
+            messages.append(_summary_to_message(self.memory_summary))
         for item in sorted_items:
             if not isinstance(item.content, ModelMessage):
                 raise ContextConversionError(msg="ContextItem 无法转换为 ModelMessage")
             messages.append(item.content)
+        for item in sorted(
+            self.tool_observations,
+            key=lambda value: int(value.metadata.get("order", 0)),
+        ):
+            messages.append(_tool_observation_to_message(item))
         return messages
+
+
+def _summary_to_message(item: ContextItem) -> ModelMessage:
+    content = item.content
+    if isinstance(content, ModelMessage):
+        return content
+    text = content.get("summary") or content.get("text")
+    if not isinstance(text, str) or not text:
+        raise ContextConversionError(msg="summary ContextItem 无法转换为 ModelMessage")
+    return ModelMessage(role=ModelRole.SYSTEM, content=[TextContentBlock(text=text)])
+
+
+def _tool_observation_to_message(item: ContextItem) -> ModelMessage:
+    content = item.content
+    if isinstance(content, ModelMessage):
+        return content
+    call_id = content.get("call_id")
+    observation = content.get("observation")
+    is_error = bool(content.get("is_error", False))
+    if not isinstance(call_id, str) or "observation" not in content:
+        raise ContextConversionError(msg="tool observation ContextItem 无法转换为 ModelMessage")
+    return ModelMessage(
+        role=ModelRole.TOOL,
+        content=[
+            ToolResultContentBlock(
+                call_id=call_id,
+                output=observation,
+                is_error=is_error,
+            )
+        ],
+    )
 
 
 def _ensure_safe_metadata(metadata: dict[str, JsonValue]) -> None:
