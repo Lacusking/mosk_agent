@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from src.api.controllers.dep.auth import InternalAuth
 from src.api.controllers.dep.db_session import CurrentSessionTransaction
+from src.api.response import ResponseModel
 from src.api.response import response_base
 from src.contracts.sessions import CreateSessionRequest
 from src.contracts.sessions import SessionMessagesResponse
@@ -33,8 +34,8 @@ async def create_session(
     return response_base.success(data=SessionResponse(session=session)).model_dump()
 
 
-@router.get("/sessions/{session_id}")
-async def get_session(session_id: str, db: CurrentSessionTransaction) -> dict:
+@router.get("/sessions/{session_id}", response_model=ResponseModel[SessionResponse])
+async def get_session(session_id: str, db: CurrentSessionTransaction):
     """读取 Session。
 
     Args:
@@ -46,10 +47,10 @@ async def get_session(session_id: str, db: CurrentSessionTransaction) -> dict:
     """
     manager = SessionManager(SessionRepository(db))
     session = await manager.require_session(session_id)
-    return response_base.success(data=SessionResponse(session=session)).model_dump()
+    return response_base.success(data=SessionResponse(session=session))
 
 
-@router.get("/sessions/{session_id}/messages")
+@router.get("/sessions/{session_id}/messages", response_model=ResponseModel[SessionMessagesResponse])
 async def get_session_messages(session_id: str, db: CurrentSessionTransaction) -> dict:
     """读取 Session 可见消息历史。
 
@@ -64,7 +65,6 @@ async def get_session_messages(session_id: str, db: CurrentSessionTransaction) -
     messages = await manager.visible_history(session_id=session_id)
     return response_base.success(
         data=SessionMessagesResponse(session_id=session_id, messages=messages)
-    ).model_dump()
-
+    )
 
 __all__ = ["router"]

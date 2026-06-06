@@ -10,6 +10,7 @@ from starlette.responses import StreamingResponse
 from src.agent_runs import AgentRunManager
 from src.api.controllers.dep.auth import InternalAuth
 from src.api.controllers.dep.db_session import CurrentSessionTransaction
+from src.api.response import ResponseModel
 from src.api.response import response_base
 from src.context import ContextBuilder
 from src.contracts.agent_runs import AgentRun
@@ -102,7 +103,7 @@ async def create_agent_run(
     return response_base.success(data=AgentRunResponse(agent_run=result.agent_run)).model_dump()
 
 
-@router.get("/agent-runs/{agent_run_id}")
+@router.get("/agent-runs/{agent_run_id}", response_model=ResponseModel[AgentRunResponse])
 async def get_agent_run(agent_run_id: str, db: CurrentSessionTransaction) -> dict:
     """读取 AgentRun 状态。
 
@@ -117,10 +118,10 @@ async def get_agent_run(agent_run_id: str, db: CurrentSessionTransaction) -> dic
     agent_run = await repository.get_run(agent_run_id)
     if agent_run is None:
         raise NotFoundError(msg="AgentRun 不存在", data={"agent_run_id": agent_run_id})
-    return response_base.success(data=AgentRunResponse(agent_run=agent_run)).model_dump()
+    return response_base.success(data=AgentRunResponse(agent_run=agent_run))
 
 
-@router.get("/agent-runs/{agent_run_id}/events")
+@router.get("/agent-runs/{agent_run_id}/events", response_model=ResponseModel[AgentRunEventsResponse])
 async def get_agent_run_events(agent_run_id: str, db: CurrentSessionTransaction) -> dict:
     """读取 AgentRun 事件时间线。
 
@@ -140,10 +141,10 @@ async def get_agent_run_events(agent_run_id: str, db: CurrentSessionTransaction)
             agent_run_id=agent_run_id,
             events=[event.model_dump(mode="json") for event in events],
         )
-    ).model_dump()
+    )
 
 
-@router.post("/agent-runs/{agent_run_id}/cancel")
+@router.post("/agent-runs/{agent_run_id}/cancel", response_model=ResponseModel[AgentRunResponse])
 async def cancel_agent_run(agent_run_id: str, db: CurrentSessionTransaction) -> dict:
     """取消 AgentRun。
 
@@ -162,7 +163,7 @@ async def cancel_agent_run(agent_run_id: str, db: CurrentSessionTransaction) -> 
     agent_run = await manager.cancel_run(agent_run_id)
     if agent_run is None:
         raise NotFoundError(msg="AgentRun 不存在或已终态", data={"agent_run_id": agent_run_id})
-    return response_base.success(data=AgentRunResponse(agent_run=agent_run)).model_dump()
+    return response_base.success(data=AgentRunResponse(agent_run=agent_run))
 
 
 def _build_kernel(
