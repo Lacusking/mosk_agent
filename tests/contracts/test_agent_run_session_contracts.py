@@ -24,6 +24,7 @@ from src.contracts import SessionMessage
 from src.contracts import SessionMessageRole
 from src.contracts import SessionMessagesResponse
 from src.contracts import SessionStatus
+from src.contracts.runtime import ModelProtocol
 from src.contracts.runtime import TextContentBlock
 
 NOW = datetime(2026, 5, 28, 12, tzinfo=UTC)
@@ -144,11 +145,19 @@ class TestAgentRunContracts:
             mode=AgentMode.BUILD,
             requested_pattern="react",
             stream=True,
+            model_provider="openai",
+            model_name="gpt-test",
+            model_protocol=ModelProtocol.OPENAI_RESPONSES,
+            model_context_window_tokens=128000,
         )
 
         assert request.mode == AgentMode.BUILD
         assert request.requested_pattern == "react"
         assert request.stream is True
+        assert request.model_provider == "openai"
+        assert request.model_name == "gpt-test"
+        assert request.model_protocol == ModelProtocol.OPENAI_RESPONSES
+        assert request.model_context_window_tokens == 128000
 
 
 class TestAgentRunStreamContracts:

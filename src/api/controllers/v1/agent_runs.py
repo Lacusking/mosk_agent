@@ -28,7 +28,8 @@ from src.runtime import AgentRunExecutionResult
 from src.runtime import AgentRuntimeKernel
 from src.runtime import CancellationRegistry
 from src.runtime import CancellationTrigger
-from src.runtime import build_mock_model_invoker
+from src.runtime import RuntimeModelSelection
+from src.runtime import build_runtime_model_target
 from src.runtime import format_sse
 from src.sessions import SessionManager
 from src.storage.database.repositories.agent_runs import AgentRunRepository
@@ -85,6 +86,12 @@ async def create_agent_run(
         patterns=patterns,
         run_manager=run_manager,
         session_manager=session_manager,
+        model_selection=RuntimeModelSelection(
+            provider=request.model_provider,
+            model=request.model_name,
+            protocol=request.model_protocol,
+            context_window_tokens=request.model_context_window_tokens,
+        ),
     )
     token = _cancellations.get_or_create(agent_run.agent_run_id)
     if request.stream:
@@ -172,6 +179,7 @@ def _build_kernel(
     patterns,
     run_manager: AgentRunManager,
     session_manager: SessionManager,
+    model_selection: RuntimeModelSelection | None = None,
 ) -> AgentRuntimeKernel:
     """构造 AgentRuntimeKernel。
 
@@ -184,6 +192,7 @@ def _build_kernel(
     Returns:
         runtime kernel。
     """
+    model_target = build_runtime_model_target(settings.models, model_selection)
     return AgentRuntimeKernel(
         patterns=patterns,
         run_manager=run_manager,
@@ -193,9 +202,12 @@ def _build_kernel(
             config=settings.agent_runtime,
         ),
         event_repository=RuntimeEventRepository(db),
-        model_invoker=build_mock_model_invoker(),
+        model_invoker=model_target.invoker,
         tool_executor=MockToolActionExecutor(),
         config=settings.agent_runtime,
+        model=model_target.model,
+        provider=model_target.provider,
+        protocol=model_target.protocol,
     )
 
 

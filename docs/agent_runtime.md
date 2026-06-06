@@ -81,6 +81,39 @@ ReAct 当前 run 内的模型响应和工具结果仍由 `PatternRuntimeState.ob
 
 mock executor 不执行命令、不访问文件、不访问网络、不读取外部凭证。事件只记录工具名、call id、状态和安全分类，不记录完整参数或敏感 observation。
 
+## Model Runtime Target
+
+runtime 通过 `src/runtime/factory.py` 构造模型调用目标。默认保持本地 mock，避免开发环境必须配置外部凭证：
+
+- `RUNTIME_MODEL_PROVIDER=mock`
+- `RUNTIME_MODEL_NAME=mock-model`
+- `RUNTIME_MODEL_PROTOCOL=mock`
+
+切换到 OpenAI 时使用同一工厂注册 OpenAI provider、profile 和 protocol adapter：
+
+- `RUNTIME_MODEL_PROVIDER=openai`
+- `RUNTIME_MODEL_NAME=<OpenAI model name>`
+- `RUNTIME_MODEL_PROTOCOL=openai_responses` 或 `openai_chat`
+- `OPENAI_API_KEY=<key>`
+- `OPENAI_BASE_URL=https://api.openai.com/v1`
+- `OPENAI_TIMEOUT_SECONDS=30`
+- `RUNTIME_MODEL_CONTEXT_WINDOW_TOKENS=<optional context window>`
+
+`AgentRuntimeKernel` 的 request provider/model/protocol 与 factory 构造出的 `RuntimeModelTarget` 保持一致；OpenAI 缺少 API key 时在工厂阶段失败，不会落到 transport 层才暴露配置错误。
+
+`POST /api/v1/agent-runs` 也可以为单次 run 覆盖模型选择；未提供字段时使用上述配置默认值：
+
+```json
+{
+  "session_id": "...",
+  "input": "hello",
+  "model_provider": "openai",
+  "model_name": "gpt-4.1-mini",
+  "model_protocol": "openai_responses",
+  "model_context_window_tokens": 128000
+}
+```
+
 ## SSE Disconnect And Cancel
 
 `stream=true` 时，服务端检测到客户端断连后通过 cancellation token 将 run 视为 `cancelled`，并避免提交未完成 assistant message。显式 `POST /cancel` 使用同一取消语义，区别仅是 trigger 为 `explicit`。

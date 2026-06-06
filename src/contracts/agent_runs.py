@@ -12,6 +12,7 @@ from pydantic import Field
 from pydantic import model_validator
 
 from src.contracts.runtime import JsonValue
+from src.contracts.runtime import ModelProtocol
 
 
 class _AgentRunSchema(PydanticBaseModel):
@@ -139,6 +140,10 @@ class CreateAgentRunRequest(_AgentRunSchema):
     mode: AgentMode = AgentMode.CHAT
     requested_pattern: str | None = None
     stream: bool = False
+    model_provider: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1)
+    model_protocol: ModelProtocol | None = None
+    model_context_window_tokens: int | None = Field(default=None, gt=0)
 
 
 class AgentRunResponse(_AgentRunSchema):
