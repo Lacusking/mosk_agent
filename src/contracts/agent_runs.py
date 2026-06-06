@@ -106,9 +106,8 @@ class AgentRun(_AgentRunSchema):
             AgentRunStatus.COMPLETED,
             AgentRunStatus.FAILED,
             AgentRunStatus.CANCELLED,
-        }:
-            if self.finish_reason is None:
-                raise ValueError("终态 AgentRun 必须包含 finish_reason")
+        } and self.finish_reason is None:
+            raise ValueError("终态 AgentRun 必须包含 finish_reason")
         if self.status != AgentRunStatus.FAILED and self.error_type is not None:
             raise ValueError("仅 failed AgentRun 可包含 error_type")
         return self

@@ -8,7 +8,6 @@ from src.runtime.error_policy import ModelErrorDecision
 from src.runtime.error_policy import decide_model_error
 from src.runtime.factory import build_mock_model_invoker
 from src.runtime.finish_reason import finish_reason_from_model_response
-from src.runtime.context import RuntimeContextBuilder
 from src.runtime.kernel import AgentRunExecutionResult
 from src.runtime.kernel import AgentRuntimeKernel
 from src.runtime.model_invoker import RuntimeModelInvoker
@@ -27,7 +26,6 @@ __all__ = [
     "AgentRunExecutionResult",
     "AgentRuntimeKernel",
     "ModelErrorDecision",
-    "RuntimeContextBuilder",
     "RuntimeModelInvoker",
     "build_mock_model_invoker",
     "can_transition",

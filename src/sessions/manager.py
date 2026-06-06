@@ -126,12 +126,14 @@ class SessionManager:
         *,
         session_id: str,
         through_sequence: int | None = None,
+        limit: int | None = None,
     ) -> list[SessionMessage]:
         """读取会话可见历史。
 
         Args:
             session_id: 会话 id。
             through_sequence: 可选上下文水位。
+            limit: 可选最近消息数量限制。
 
         Returns:
             按 sequence 升序排列的 SessionMessage 列表。
@@ -140,6 +142,7 @@ class SessionManager:
         return await self._repository.list_messages(
             session_id,
             through_sequence=through_sequence,
+            limit=limit,
         )
 
     async def model_context(
@@ -147,12 +150,14 @@ class SessionManager:
         *,
         session_id: str,
         through_sequence: int,
+        limit: int | None = None,
     ) -> list[ModelMessage]:
         """读取固定水位下的模型上下文。
 
         Args:
             session_id: 会话 id。
             through_sequence: AgentRun 创建时固定的上下文水位。
+            limit: 可选最近消息数量限制。
 
         Returns:
             可交给模型 adapter 的消息列表。
@@ -160,6 +165,7 @@ class SessionManager:
         messages = await self.visible_history(
             session_id=session_id,
             through_sequence=through_sequence,
+            limit=limit,
         )
         return to_model_messages(messages)
 

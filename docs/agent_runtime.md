@@ -28,9 +28,21 @@
 2. `PatternSelector` 按显式 pattern、mode 默认、`single_turn` fallback 选择策略。
 3. `SessionManager` 追加 user message，并将该 sequence 固定为 `context_message_sequence`。
 4. `AgentRunManager` 创建 run，保证同一 Session 只有一个 `created/running` run。
-5. `AgentRuntimeKernel` 执行 pattern action loop。
-6. Runtime 统一执行模型、mock tool、pattern transition、完成、失败和取消。
-7. 成功完成时仅写入最终 assistant message。
+5. `ContextBuilder` 读取水位内最近 session messages，构造 `ContextBundle`，并通过 context strategy pipeline 做基础裁剪。
+6. `AgentRuntimeKernel` 将 `ContextBundle.to_model_messages()` 放入 `PatternRuntimeState.visible_context_messages`，再执行 pattern action loop。
+7. Runtime 统一执行模型、mock tool、pattern transition、完成、失败和取消。
+8. 成功完成时仅写入最终 assistant message。
+
+## Context Assembly
+
+上下文装配入口位于 `src/context`。当前实现只填充 session messages 槽位：
+
+- `ContextItem`：包装单段上下文，记录 source/type/content/priority/token_count/pinned/evictable/metadata。
+- `ContextBundle`：按 AgentRun 聚合 session messages，并预留 memory summary、tool observations、artifacts 槽位。
+- `ContextBuilder`：按 `context_message_sequence` 和 `CONTEXT_WINDOW_MESSAGES` 读取最近消息，并保持 sequence 升序。
+- `ContextStrategyPipeline`：首期默认只接入 `SnipCompactStrategy`。
+
+ReAct 当前 run 内的模型响应和工具结果仍由 `PatternRuntimeState.observations` 管理，不复制到 `ContextBundle.tool_observations`。该槽位仅预留给未来跨 step 或跨 run 的持久化 observation 装配。
 
 ## Patterns
 

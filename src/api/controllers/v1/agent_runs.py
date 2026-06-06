@@ -11,10 +11,10 @@ from src.agent_runs import AgentRunManager
 from src.api.controllers.dep.auth import InternalAuth
 from src.api.controllers.dep.db_session import CurrentSessionTransaction
 from src.api.response import response_base
+from src.context import ContextBuilder
 from src.contracts.agent_runs import AgentRun
 from src.contracts.agent_runs import AgentRunEventsResponse
 from src.contracts.agent_runs import AgentRunResponse
-from src.contracts.agent_runs import AgentRunStreamEvent
 from src.contracts.agent_runs import CreateAgentRunRequest
 from src.contracts.runtime import PatternSelectedPayload
 from src.contracts.runtime import RuntimeEventType
@@ -187,6 +187,10 @@ def _build_kernel(
         patterns=patterns,
         run_manager=run_manager,
         session_manager=session_manager,
+        context_builder=ContextBuilder(
+            session_manager=session_manager,
+            config=settings.agent_runtime,
+        ),
         event_repository=RuntimeEventRepository(db),
         model_invoker=build_mock_model_invoker(),
         tool_executor=MockToolActionExecutor(),

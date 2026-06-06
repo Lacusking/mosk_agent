@@ -5,9 +5,9 @@ from src.contracts.runtime import ModelProtocol
 from src.models import ModelProfile
 from src.models import ModelSelector
 from src.models import ProfileRegistry
+from src.models import ProtocolRegistry
 from src.models import ProviderRegistration
 from src.models import ProviderRegistry
-from src.models import ProtocolRegistry
 from src.models.providers.mock import MockModelAdapter
 from src.models.providers.mock import MockProtocolAdapter
 from src.runtime.model_invoker import RuntimeModelInvoker

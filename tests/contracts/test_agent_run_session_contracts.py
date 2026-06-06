@@ -10,10 +10,10 @@ from src.contracts import AgentMode
 from src.contracts import AgentRun
 from src.contracts import AgentRunFinishReason
 from src.contracts import AgentRunStatus
-from src.contracts import AgentRunStreamEvent
 from src.contracts import AgentRunStep
 from src.contracts import AgentRunStepKind
 from src.contracts import AgentRunStepStatus
+from src.contracts import AgentRunStreamEvent
 from src.contracts import CreateAgentRunRequest
 from src.contracts import CreateSessionRequest
 from src.contracts import OutputTextDeltaStreamPayload

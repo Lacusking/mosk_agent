@@ -103,6 +103,10 @@ class AgentRuntimeConfig(AppBaseSetting):
     AGENT_RUN_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
     AGENT_RUN_MODEL_RETRY_LIMIT: int = Field(default=1, ge=0)
     ENABLE_MOCK_TOOL_ACTIONS: bool = Field(default=True)
+    CONTEXT_WINDOW_MESSAGES: int = Field(default=50, gt=0)
+    CONTEXT_SNIP_THRESHOLD_MESSAGES: int = Field(default=30, gt=0)
+    CONTEXT_SNIP_HEAD_MESSAGES: int = Field(default=2, ge=0)
+    CONTEXT_SNIP_TAIL_MESSAGES: int = Field(default=8, ge=0)
 
     @field_validator("DEFAULT_AGENT_MODE")
     @classmethod
@@ -163,6 +167,12 @@ class AgentRuntimeConfig(AppBaseSetting):
         }
         if not mode_to_pattern[self.DEFAULT_AGENT_MODE]:
             raise ValueError("DEFAULT_AGENT_MODE 缺少对应默认 pattern")
+        if self.CONTEXT_SNIP_HEAD_MESSAGES + self.CONTEXT_SNIP_TAIL_MESSAGES > (
+            self.CONTEXT_SNIP_THRESHOLD_MESSAGES
+        ):
+            raise ValueError("CONTEXT_SNIP_HEAD_MESSAGES 与 CONTEXT_SNIP_TAIL_MESSAGES 之和不能超过阈值")
+        if self.CONTEXT_SNIP_THRESHOLD_MESSAGES > self.CONTEXT_WINDOW_MESSAGES:
+            raise ValueError("CONTEXT_SNIP_THRESHOLD_MESSAGES 不能大于 CONTEXT_WINDOW_MESSAGES")
         return self
 
 

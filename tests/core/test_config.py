@@ -1,6 +1,5 @@
 """配置模块测试。"""
 
-import os
 
 import pytest
 

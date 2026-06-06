@@ -6,10 +6,10 @@ httpx 扩展注册
 
 import logging
 
+from src.api.extensions.extension_http.schema import ServiceClient
 from src.core.config import settings
 from src.core.httpx_client import ClientConfig
 from src.core.httpx_client import HttpxClientManager
-from src.api.extensions.extension_http.schema import ServiceClient
 
 logger = logging.getLogger(__name__)
 

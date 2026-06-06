@@ -9,7 +9,6 @@ from __future__ import annotations
 import dataclasses
 from enum import Enum
 from typing import Any
-from typing import TypeAlias
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -60,8 +59,8 @@ class CustomResponse:
     msg: str
 
 
-ResponseItem: TypeAlias = BaseModel | dict[str, Any]
-ResponseData: TypeAlias = ResponseItem | list[ResponseItem] | None
+type ResponseItem = BaseModel | dict[str, Any]
+type ResponseData = ResponseItem | list[ResponseItem] | None
 
 
 class ResponseModel(BaseModel):

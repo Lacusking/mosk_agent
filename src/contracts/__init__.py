@@ -4,9 +4,6 @@
 ``src.contracts.runtime``。以下导出仅保留既有 ORM 类型的兼容入口。
 """
 
-from src.contracts.database import BaseModel
-from src.contracts.database import PkModel
-from src.contracts.database import TimestampedModel
 from src.contracts.agent_runs import AgentMode
 from src.contracts.agent_runs import AgentRun
 from src.contracts.agent_runs import AgentRunEventsResponse
@@ -21,6 +18,9 @@ from src.contracts.agent_runs import CreateAgentRunRequest
 from src.contracts.agent_runs import OutputTextDeltaStreamPayload
 from src.contracts.agent_runs import RunStartedStreamPayload
 from src.contracts.agent_runs import RunTerminalStreamPayload
+from src.contracts.database import BaseModel
+from src.contracts.database import PkModel
+from src.contracts.database import TimestampedModel
 from src.contracts.patterns import ChainConfig
 from src.contracts.patterns import ChainStage
 from src.contracts.patterns import CompleteAction

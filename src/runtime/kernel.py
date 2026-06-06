@@ -6,6 +6,8 @@ from time import monotonic
 from uuid import uuid4
 
 from src.agent_runs import AgentRunManager
+from src.context import ContextBuilder
+from src.context import ContextError
 from src.contracts.agent_runs import AgentRun
 from src.contracts.agent_runs import AgentRunFinishReason
 from src.contracts.agent_runs import AgentRunStatus
@@ -72,6 +74,7 @@ class AgentRuntimeKernel:
         patterns: PatternRegistry,
         run_manager: AgentRunManager,
         session_manager: SessionManager,
+        context_builder: ContextBuilder,
         event_repository: RuntimeEventRepository,
         model_invoker: RuntimeModelInvoker,
         tool_executor: ToolActionExecutor,
@@ -86,6 +89,7 @@ class AgentRuntimeKernel:
             patterns: pattern 注册表。
             run_manager: AgentRun manager。
             session_manager: Session manager。
+            context_builder: 上下文构造器。
             event_repository: 事件仓库。
             model_invoker: 模型调用封装。
             tool_executor: 工具动作 executor。
@@ -97,6 +101,7 @@ class AgentRuntimeKernel:
         self._patterns = patterns
         self._run_manager = run_manager
         self._session_manager = session_manager
+        self._context_builder = context_builder
         self._events = event_repository
         self._model_invoker = model_invoker
         self._tool_executor = tool_executor
@@ -166,10 +171,8 @@ class AgentRuntimeKernel:
         step_count = 0
 
         try:
-            context = await self._session_manager.model_context(
-                session_id=current_run.session_id,
-                through_sequence=current_run.context_message_sequence,
-            )
+            context_bundle = await self._context_builder.build(current_run)
+            context = context_bundle.to_model_messages()
             while step_count < current_run.max_steps:
                 if cancellation_token:
                     cancellation_token.raise_if_cancelled()
@@ -333,6 +336,20 @@ class AgentRuntimeKernel:
             )
             yield AgentRunExecutionResult(agent_run=current_run)
         except ModelError as exc:
+            current_run = await self._fail_run(
+                current_run,
+                error_type=exc.__class__.__name__,
+                step_count=step_count,
+                started_at=started_at,
+            )
+            yield terminal_event(
+                agent_run_id=current_run.agent_run_id,
+                status="failed",
+                finish_reason=current_run.finish_reason,
+                error_type=current_run.error_type,
+            )
+            yield AgentRunExecutionResult(agent_run=current_run)
+        except ContextError as exc:
             current_run = await self._fail_run(
                 current_run,
                 error_type=exc.__class__.__name__,
