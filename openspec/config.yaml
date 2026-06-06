@@ -64,6 +64,21 @@ context: |
 
 rules:
 
+  changes:
+    - change 目录必须位于 openspec/changes/
+    - 推荐格式：YYYYMMDD-NNN-verb-target，保证有序，方便溯源
+    - 一个 change 只对应一个独立需求、问题修复或架构调整
+    - 每个 change 至少包含 proposal.md、tasks.md、specs/
+    - 涉及架构、API、数据库、权限、状态机或跨模块变更时必须包含 design.md
+    - specs/ 下允许多个 spec，必须按依赖关系或实现顺序编号
+    - spec 目录格式：NN-capability-name，保证有序，方便溯源
+    - 一个 spec 只描述一个独立能力
+    - spec 之间依赖应保持单向，禁止循环依赖
+    - design.md 必须说明 spec 之间的关系与依赖
+    - tasks.md 必须可追溯到对应 spec 或 Requirement
+    - change 完成后保留目录用于溯源，不得删除
+    - 废弃 change 必须说明原因，不得直接删除
+
   proposal:
     - 必须包含章节：Why、What、Impact、Non-goals
     - proposal 应保持精炼；为明确边界、假设、兼容性和迁移风险时允许适度超过 500 字
@@ -71,15 +86,25 @@ rules:
     - 必须列出关键假设、歧义取舍与最小改动理由
     - 必须标注受影响模块（src/<模块名>/testing/database/devops/docs）
     - 必须说明 API 兼容性影响、配置变更风险、数据迁移风险
+    - 必须声明 change 创建日期、当前状态与关联需求来源
+    - change 状态必须明确，可选值为 draft、active、implemented、validated、archived
+    - active 状态表示允许进入实现
+    - implemented 状态表示代码已完成，但不等于验收完成
+    - validated 状态表示代码、测试、文档与验收场景均已闭环
+    - archived 状态表示变更已归档，不应继续修改；如需继续迭代，应新建 change
 
   specs:
-    - 每个spec需要使用中文编写
+    - 每个 spec 需要使用中文编写
+    - 每个 spec 必须对应一个独立能力或领域边界
+    - 每个 spec 目录必须使用有序命名，推荐格式：NN-capability-name
     - 每个 Requirement 必须使用 Gherkin 场景（Given / When / Then）
     - Requirement 描述系统行为，不描述框架实现
     - 每个 Requirement 必须原子化且可独立测试
     - 每个 Requirement 至少包含一个成功场景
     - 每个能力至少包含一个失败场景（鉴权失败/参数错误/资源不存在/超时或取消）
     - 涉及 API 必须明确 method、path、认证方式、关键请求响应字段
+    - 存在多个 spec 时，必须能从编号看出主要依赖顺序或实现顺序
+    - 禁止为了排序频繁修改已有 spec 编号，避免破坏历史溯源
 
   design:
     - 必须包含章节：Architecture、Components、APIs、Data Model
@@ -88,6 +113,8 @@ rules:
     - 必须说明为何是最小实现路径
     - 涉及数据库变更必须给出 migration 与回滚方案
     - 涉及高风险动作必须说明权限边界、审计方式与失败降级策略
+    - 当 change 下存在多个 spec 时，必须说明 spec 之间的依赖关系、执行顺序与边界划分
+    - 当 spec 之间存在前置依赖时，必须说明依赖原因与失败降级策略
 
   tasks:
     - 任务粒度应控制在 1-2 小时
@@ -95,5 +122,7 @@ rules:
     - 必须包含测试任务与文档更新任务
     - 避免一个任务同时修改多个无关模块
     - 每个任务必须声明验证方式（自动化命令或手工验收路径）
-    - 每个任务必须可追溯到对应需求与受影响模块
+    - 每个任务必须可追溯到对应需求、spec 编号与受影响模块
     - 涉及数据库变更必须包含 migration 编写、执行与回滚验证
+    - 多 spec change 中，tasks 应按 spec 编号或依赖顺序组织
+    - 跨 spec 的任务必须明确说明依赖来源和影响范围
