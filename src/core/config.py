@@ -84,6 +84,25 @@ class ModelProviderConfig(AppBaseSetting):
     OPENAI_BASE_URL: str = Field(default="https://api.openai.com/v1")
     OPENAI_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
     MOCK_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+    RUNTIME_MODEL_PROVIDER: str = Field(default="mock")
+    RUNTIME_MODEL_NAME: str = Field(default="mock-model")
+    RUNTIME_MODEL_PROTOCOL: str = Field(default="mock")
+    RUNTIME_MODEL_CONTEXT_WINDOW_TOKENS: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_runtime_model(self) -> "ModelProviderConfig":
+        """校验 runtime 默认模型选择配置。"""
+        provider = self.RUNTIME_MODEL_PROVIDER
+        protocol = self.RUNTIME_MODEL_PROTOCOL
+        if provider not in {"mock", "openai"}:
+            raise ValueError("RUNTIME_MODEL_PROVIDER 不受支持")
+        if protocol not in {"mock", "openai_chat", "openai_responses"}:
+            raise ValueError("RUNTIME_MODEL_PROTOCOL 不受支持")
+        if provider == "mock" and protocol != "mock":
+            raise ValueError("mock provider 必须使用 mock protocol")
+        if provider == "openai" and protocol == "mock":
+            raise ValueError("openai provider 必须使用 OpenAI protocol")
+        return self
 
 
 class AgentRuntimeConfig(AppBaseSetting):
@@ -103,6 +122,14 @@ class AgentRuntimeConfig(AppBaseSetting):
     AGENT_RUN_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
     AGENT_RUN_MODEL_RETRY_LIMIT: int = Field(default=1, ge=0)
     ENABLE_MOCK_TOOL_ACTIONS: bool = Field(default=True)
+    CONTEXT_WINDOW_MESSAGES: int = Field(default=50, gt=0)
+    CONTEXT_SNIP_THRESHOLD_MESSAGES: int = Field(default=30, gt=0)
+    CONTEXT_SNIP_HEAD_MESSAGES: int = Field(default=2, ge=0)
+    CONTEXT_SNIP_TAIL_MESSAGES: int = Field(default=8, ge=0)
+    CONTEXT_TOKEN_BUDGET: int = Field(default=32768, gt=0)
+    CONTEXT_TOKEN_RESERVE: int = Field(default=4096, ge=0)
+    CONTEXT_MICRO_ITEM_MAX_TOKENS: int = Field(default=4096, gt=0)
+    CONTEXT_TOOL_RESULT_BUDGET_TOKENS: int = Field(default=8192, gt=0)
 
     @field_validator("DEFAULT_AGENT_MODE")
     @classmethod
@@ -163,6 +190,18 @@ class AgentRuntimeConfig(AppBaseSetting):
         }
         if not mode_to_pattern[self.DEFAULT_AGENT_MODE]:
             raise ValueError("DEFAULT_AGENT_MODE 缺少对应默认 pattern")
+        if self.CONTEXT_SNIP_HEAD_MESSAGES + self.CONTEXT_SNIP_TAIL_MESSAGES > (
+            self.CONTEXT_SNIP_THRESHOLD_MESSAGES
+        ):
+            raise ValueError("CONTEXT_SNIP_HEAD_MESSAGES 与 CONTEXT_SNIP_TAIL_MESSAGES 之和不能超过阈值")
+        if self.CONTEXT_SNIP_THRESHOLD_MESSAGES > self.CONTEXT_WINDOW_MESSAGES:
+            raise ValueError("CONTEXT_SNIP_THRESHOLD_MESSAGES 不能大于 CONTEXT_WINDOW_MESSAGES")
+        if self.CONTEXT_TOKEN_RESERVE >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_TOKEN_RESERVE 必须小于 CONTEXT_TOKEN_BUDGET")
+        if self.CONTEXT_MICRO_ITEM_MAX_TOKENS >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_MICRO_ITEM_MAX_TOKENS 必须小于 CONTEXT_TOKEN_BUDGET")
+        if self.CONTEXT_TOOL_RESULT_BUDGET_TOKENS >= self.CONTEXT_TOKEN_BUDGET:
+            raise ValueError("CONTEXT_TOOL_RESULT_BUDGET_TOKENS 必须小于 CONTEXT_TOKEN_BUDGET")
         return self
 
 

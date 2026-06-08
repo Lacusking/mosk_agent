@@ -11,6 +11,7 @@ from src.contracts.runtime import ModelStopReason
 from src.contracts.runtime import ModelUsage
 from src.exceptions import ModelAuthenticationError
 from src.exceptions import ModelAuthorizationError
+from src.exceptions import ModelContextLengthError
 from src.exceptions import ModelInvalidRequestError
 from src.exceptions import ModelRateLimitError
 from src.exceptions import ModelStreamInterruptedError
@@ -75,6 +76,43 @@ def test_openai_error_timeout_maps_to_retryable_model_timeout() -> None:
 
     assert isinstance(error, ModelTimeoutError)
     assert error.retryable is True
+
+
+def test_openai_context_length_error_maps_to_retryable_context_error() -> None:
+    """Provider 明确返回 context_length_exceeded 时映射为上下文超限错误。"""
+    response = httpx.Response(
+        413,
+        json={
+            "error": {
+                "code": "context_length_exceeded",
+                "prompt_tokens": 150000,
+                "max_context_tokens": 128000,
+            }
+        },
+        request=httpx.Request("POST", "https://provider.test/v1/responses"),
+    )
+    original = httpx.HTTPStatusError("too long", request=response.request, response=response)
+
+    error = map_provider_error(original, _context(), operation="invoke")
+
+    assert isinstance(error, ModelContextLengthError)
+    assert error.retryable is True
+    assert error.data["details"]["prompt_tokens"] == 150000
+    assert error.data["details"]["max_context_tokens"] == 128000
+
+
+def test_openai_non_context_413_maps_to_invalid_request() -> None:
+    """非 context_length_exceeded 的 413 不触发上下文缩减语义。"""
+    response = httpx.Response(
+        413,
+        json={"error": {"code": "request_too_large"}},
+        request=httpx.Request("POST", "https://provider.test/v1/responses"),
+    )
+    original = httpx.HTTPStatusError("too large", request=response.request, response=response)
+
+    error = map_provider_error(original, _context(), operation="invoke")
+
+    assert isinstance(error, ModelInvalidRequestError)
 
 
 def test_openai_error_interrupted_stream_preserves_partial_state() -> None:

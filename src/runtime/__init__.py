@@ -6,9 +6,13 @@ from src.runtime.cancellation import CancellationTrigger
 from src.runtime.cancellation import CancelledError
 from src.runtime.error_policy import ModelErrorDecision
 from src.runtime.error_policy import decide_model_error
+from src.runtime.factory import RuntimeModelSelection
+from src.runtime.factory import RuntimeModelTarget
 from src.runtime.factory import build_mock_model_invoker
+from src.runtime.factory import build_openai_model_invoker
+from src.runtime.factory import build_runtime_model_invoker
+from src.runtime.factory import build_runtime_model_target
 from src.runtime.finish_reason import finish_reason_from_model_response
-from src.runtime.context import RuntimeContextBuilder
 from src.runtime.kernel import AgentRunExecutionResult
 from src.runtime.kernel import AgentRuntimeKernel
 from src.runtime.model_invoker import RuntimeModelInvoker
@@ -27,9 +31,13 @@ __all__ = [
     "AgentRunExecutionResult",
     "AgentRuntimeKernel",
     "ModelErrorDecision",
-    "RuntimeContextBuilder",
     "RuntimeModelInvoker",
+    "RuntimeModelSelection",
+    "RuntimeModelTarget",
     "build_mock_model_invoker",
+    "build_openai_model_invoker",
+    "build_runtime_model_invoker",
+    "build_runtime_model_target",
     "can_transition",
     "decide_model_error",
     "ensure_transition",

@@ -1,6 +1,5 @@
 """配置模块测试。"""
 
-import os
 
 import pytest
 
@@ -62,6 +61,19 @@ class TestConfig:
         assert config.AGENT_RUN_TIMEOUT_SECONDS == 120
         assert config.AGENT_RUN_MODEL_RETRY_LIMIT == 1
         assert config.ENABLE_MOCK_TOOL_ACTIONS is True
+        assert config.CONTEXT_TOKEN_BUDGET > config.CONTEXT_TOKEN_RESERVE
+        assert config.CONTEXT_MICRO_ITEM_MAX_TOKENS < config.CONTEXT_TOKEN_BUDGET
+        assert config.CONTEXT_TOOL_RESULT_BUDGET_TOKENS < config.CONTEXT_TOKEN_BUDGET
+
+    def test_model_provider_runtime_defaults(self) -> None:
+        """模型 provider 默认仍使用 mock，保持本地开发兼容。"""
+        from src.core.config import ModelProviderConfig
+
+        config = ModelProviderConfig()
+
+        assert config.RUNTIME_MODEL_PROVIDER == "mock"
+        assert config.RUNTIME_MODEL_NAME == "mock-model"
+        assert config.RUNTIME_MODEL_PROTOCOL == "mock"
 
     def test_agent_runtime_env_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """环境变量可以覆盖 Agent runtime 运行限制。"""
@@ -88,6 +100,7 @@ class TestConfig:
             ("DEFAULT_BUILD_PATTERN", "unknown", "默认 pattern"),
             ("AGENT_RUN_MAX_STEPS", "0", "greater than 0"),
             ("AGENT_RUN_MODEL_RETRY_LIMIT", "-1", "greater than or equal to 0"),
+            ("CONTEXT_TOKEN_RESERVE", "32768", "CONTEXT_TOKEN_RESERVE"),
         ],
     )
     def test_agent_runtime_rejects_invalid_config(
@@ -104,3 +117,16 @@ class TestConfig:
 
         with pytest.raises(ValueError, match=match):
             AgentRuntimeConfig()
+
+    def test_model_provider_config_rejects_invalid_runtime_model_combo(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """runtime 模型 provider/protocol 组合必须一致。"""
+        monkeypatch.setenv("RUNTIME_MODEL_PROVIDER", "openai")
+        monkeypatch.setenv("RUNTIME_MODEL_PROTOCOL", "mock")
+
+        from src.core.config import ModelProviderConfig
+
+        with pytest.raises(ValueError, match="openai provider"):
+            ModelProviderConfig()

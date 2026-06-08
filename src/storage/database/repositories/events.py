@@ -8,11 +8,11 @@ from sqlalchemy import func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.utils import generate_uuid7
 from src.contracts.runtime import RuntimeActorType
 from src.contracts.runtime import RuntimeEvent
 from src.contracts.runtime import RuntimeEventPayload
 from src.contracts.runtime import RuntimeEventType
+from src.core.utils import generate_uuid7
 from src.storage.database.models.events import RuntimeEventRecord
 from src.storage.database.time import aware_utc_from_db
 

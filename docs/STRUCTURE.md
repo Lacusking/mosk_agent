@@ -41,7 +41,7 @@ src/
 ├── events/              # 事件契约/服务发现入口；RuntimeEvent repository 位于 storage/database/repositories
 ├── agent_runs/          # 执行记录业务层：AgentRun manager、状态编排；ORM/repository 位于 storage/database
 ├── tasks/               # 后续计划引擎：todo/reminder/持久化 plan；不作为 Agent 执行生命周期
-├── sessions/            # 会话业务层：Session manager、消息转换、上下文压缩；ORM/repository 位于 storage/database
+├── sessions/            # 会话业务层：Session manager、消息转换、可见历史提交；ORM/repository 位于 storage/database
 ├── scheduler/           # 平台级调度器：定时任务、延迟任务、周期任务、后台任务、锁、租约、队列
 │
 ├── models/              # 模型适配层：OpenAI Chat/Responses 与 Mock；Anthropic 仅预留协议身份
@@ -56,7 +56,7 @@ src/
 │
 ├── tools/               # 工具系统：工具定义、注册、路由、执行、Schema 校验、权限、重试、幂等、MCP 工具适配
 ├── connectors/          # 外部系统连接器：GitHub、Slack、Jira、数据库、浏览器、Google Drive 等 API 封装
-├── context/             # 上下文管理：上下文组装、裁剪、压缩、Token Budget、工具结果格式化、结构化输出解析
+├── context/             # 上下文管理：ContextItem/Bundle、session window、策略管线、裁剪与预算入口
 ├── memory/              # 记忆系统：Session、Working、Summary、Semantic、Entity、Episodic Memory 及写入/遗忘策略
 ├── knowledge/           # 知识资产管理：语料、文档、解析、切分、索引、元数据、权限、来源追踪
 ├── rag/                 # 检索增强生成：Retriever、Embedding、Reranker、Citation、Grounding、知识片段注入

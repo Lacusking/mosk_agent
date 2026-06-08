@@ -9,11 +9,15 @@ from __future__ import annotations
 import dataclasses
 from enum import Enum
 from typing import Any
-from typing import TypeAlias
+from typing import Generic
+from typing import TypeVar
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+
+
+T = TypeVar("T")
 
 
 class CustomCodeBase(Enum):
@@ -60,18 +64,18 @@ class CustomResponse:
     msg: str
 
 
-ResponseItem: TypeAlias = BaseModel | dict[str, Any]
-ResponseData: TypeAlias = ResponseItem | list[ResponseItem] | None
+type ResponseItem = BaseModel | dict[str, Any]
+type ResponseData = ResponseItem | list[ResponseItem] | None
 
 
-class ResponseModel(BaseModel):
+class ResponseModel(BaseModel, Generic[T]):
     """统一响应模型。"""
 
     model_config = ConfigDict(extra="forbid")
 
     code: int = Field(default=GeneralResponseCode.HTTP_200.code, description="返回状态码")
     msg: str = Field(default=GeneralResponseCode.HTTP_200.msg, description="返回信息")
-    data: BaseModel | dict[str, Any] = Field(default_factory=dict, description="返回数据")
+    data: T | None = Field(default=None, description="返回数据")
 
 
 class ResponseBase:
@@ -99,17 +103,32 @@ class ResponseBase:
         )
 
     @classmethod
-    def _response(cls, *, res: GeneralResponseCode, data: ResponseData = None) -> ResponseModel:
-        return ResponseModel(code=res.code, msg=res.msg, data=cls._normalize_data(data))
+    def _response(
+        cls,
+        *,
+        res: GeneralResponseCode,
+        data: ResponseData = None,
+    ) -> ResponseModel:
+        return ResponseModel(
+            code=res.code,
+            msg=res.msg,
+            data=cls._normalize_data(data),
+        )
 
     def success(
-        self, *, res: GeneralResponseCode = GeneralResponseCode.HTTP_200, data: ResponseData = None
+        self,
+        *,
+        res: GeneralResponseCode = GeneralResponseCode.HTTP_200,
+        data: ResponseData = None,
     ) -> ResponseModel:
         """构造成功响应。"""
         return self._response(res=res, data=data)
 
     def fail(
-        self, *, res: GeneralResponseCode = GeneralResponseCode.HTTP_400, data: ResponseData = None
+        self,
+        *,
+        res: GeneralResponseCode = GeneralResponseCode.HTTP_400,
+        data: ResponseData = None,
     ) -> ResponseModel:
         """构造失败响应。"""
         return self._response(res=res, data=data)

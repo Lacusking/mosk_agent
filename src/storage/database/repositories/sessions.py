@@ -162,12 +162,14 @@ class SessionRepository:
         session_id: str | UUID,
         *,
         through_sequence: int | None = None,
+        limit: int | None = None,
     ) -> list[SessionMessage]:
         """按 sequence 升序读取会话可见消息。
 
         Args:
             session_id: 会话 id。
             through_sequence: 可选上下文水位；存在时只读取该序号及之前消息。
+            limit: 可选最近消息数量限制。
 
         Returns:
             有序 SessionMessage 列表。
@@ -177,6 +179,11 @@ class SessionRepository:
         )
         if through_sequence is not None:
             statement = statement.where(SessionMessageRecord.sequence <= through_sequence)
+        if limit is not None:
+            statement = statement.order_by(SessionMessageRecord.sequence.desc()).limit(limit)
+            result = await self._db.execute(statement)
+            records = list(reversed(result.scalars().all()))
+            return [_record_to_message(record) for record in records]
         statement = statement.order_by(SessionMessageRecord.sequence.asc())
         result = await self._db.execute(statement)
         return [_record_to_message(record) for record in result.scalars().all()]

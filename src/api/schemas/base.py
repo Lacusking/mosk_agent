@@ -6,7 +6,6 @@ Pydantic Schema 基类
 
 from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -19,9 +18,9 @@ class SchemaBase(BaseModel):
         use_enum_values=True,
         json_encoders={
             datetime: lambda dt: (
-                dt.replace(tzinfo=timezone.utc).isoformat()
+                dt.replace(tzinfo=UTC).isoformat()
                 if dt.tzinfo is None
-                else dt.astimezone(timezone.utc).isoformat()
+                else dt.astimezone(UTC).isoformat()
             )
         },
     )

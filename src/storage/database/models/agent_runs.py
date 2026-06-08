@@ -13,9 +13,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
+from src.contracts.agent_runs import AgentRunStatus
 from src.contracts.agent_runs import AgentRunStepKind
 from src.contracts.agent_runs import AgentRunStepStatus
-from src.contracts.agent_runs import AgentRunStatus
 from src.storage.database import PkModel
 from src.storage.database import TimestampedModel
 

@@ -187,6 +187,35 @@ class ModelInvalidRequestError(ModelError):
     default_msg = "模型请求非法"
 
 
+class ModelContextLengthError(ModelError):
+    """模型请求上下文超过 provider context window。"""
+
+    code = 52413
+    default_msg = "模型上下文长度超限"
+    retryable = True
+
+    def __init__(
+        self,
+        *,
+        prompt_tokens: int | None = None,
+        max_context_tokens: int | None = None,
+        data: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """初始化上下文超限错误。"""
+        details = dict(data or {})
+        provider_reported_tokens: dict[str, int] = {}
+        if prompt_tokens is not None:
+            details["prompt_tokens"] = prompt_tokens
+            provider_reported_tokens["prompt_tokens"] = prompt_tokens
+        if max_context_tokens is not None:
+            details["max_context_tokens"] = max_context_tokens
+            provider_reported_tokens["max_context_tokens"] = max_context_tokens
+        if provider_reported_tokens:
+            details["provider_reported_tokens"] = provider_reported_tokens
+        super().__init__(data=details, **kwargs)
+
+
 class ModelCapabilityError(ModelError):
     """目标模型不具备请求所需能力。"""
 

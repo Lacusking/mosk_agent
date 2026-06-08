@@ -6,6 +6,8 @@ from time import monotonic
 from uuid import uuid4
 
 from src.agent_runs import AgentRunManager
+from src.context import ContextBuilder
+from src.context import ContextError
 from src.contracts.agent_runs import AgentRun
 from src.contracts.agent_runs import AgentRunFinishReason
 from src.contracts.agent_runs import AgentRunStatus
@@ -25,6 +27,7 @@ from src.contracts.runtime import ContentDeltaPayload
 from src.contracts.runtime import ModelInvocationCompletedPayload
 from src.contracts.runtime import ModelInvocationFailedPayload
 from src.contracts.runtime import ModelInvocationStartedPayload
+from src.contracts.runtime import ModelMessage
 from src.contracts.runtime import ModelProtocol
 from src.contracts.runtime import ModelRequest
 from src.contracts.runtime import ModelResponse
@@ -72,6 +75,7 @@ class AgentRuntimeKernel:
         patterns: PatternRegistry,
         run_manager: AgentRunManager,
         session_manager: SessionManager,
+        context_builder: ContextBuilder,
         event_repository: RuntimeEventRepository,
         model_invoker: RuntimeModelInvoker,
         tool_executor: ToolActionExecutor,
@@ -86,6 +90,7 @@ class AgentRuntimeKernel:
             patterns: pattern 注册表。
             run_manager: AgentRun manager。
             session_manager: Session manager。
+            context_builder: 上下文构造器。
             event_repository: 事件仓库。
             model_invoker: 模型调用封装。
             tool_executor: 工具动作 executor。
@@ -97,6 +102,7 @@ class AgentRuntimeKernel:
         self._patterns = patterns
         self._run_manager = run_manager
         self._session_manager = session_manager
+        self._context_builder = context_builder
         self._events = event_repository
         self._model_invoker = model_invoker
         self._tool_executor = tool_executor
@@ -166,13 +172,14 @@ class AgentRuntimeKernel:
         step_count = 0
 
         try:
-            context = await self._session_manager.model_context(
-                session_id=current_run.session_id,
-                through_sequence=current_run.context_message_sequence,
-            )
             while step_count < current_run.max_steps:
                 if cancellation_token:
                     cancellation_token.raise_if_cancelled()
+                context_bundle = await self._context_builder.build(
+                    current_run,
+                    observations=observations,
+                )
+                context = context_bundle.to_model_messages()
                 pattern = self._patterns.require(current_run.active_pattern)
                 state = PatternRuntimeState(
                     agent_run=current_run,
@@ -346,6 +353,20 @@ class AgentRuntimeKernel:
                 error_type=current_run.error_type,
             )
             yield AgentRunExecutionResult(agent_run=current_run)
+        except ContextError as exc:
+            current_run = await self._fail_run(
+                current_run,
+                error_type=exc.__class__.__name__,
+                step_count=step_count,
+                started_at=started_at,
+            )
+            yield terminal_event(
+                agent_run_id=current_run.agent_run_id,
+                status="failed",
+                finish_reason=current_run.finish_reason,
+                error_type=current_run.error_type,
+            )
+            yield AgentRunExecutionResult(agent_run=current_run)
 
     async def _execute_model_action(
         self,
@@ -465,6 +486,12 @@ class AgentRuntimeKernel:
                 await self._append_model_failed(agent_run, step, request.invocation_id, exc)
                 if not decision.retry:
                     raise
+                if decision.context_reduction_retry:
+                    request = _context_reduced_request(
+                        request,
+                        tail_messages=max(1, self._config.CONTEXT_SNIP_TAIL_MESSAGES // 2),
+                        max_text_chars=max(64, self._config.CONTEXT_MICRO_ITEM_MAX_TOKENS * 2),
+                    )
                 retry_count += 1
 
     async def _execute_tool_action(
@@ -848,6 +875,51 @@ def _response_text(response: ModelResponse) -> str:
 
 def _latency_ms(started_at: float) -> float:
     return max(0.0, (monotonic() - started_at) * 1000)
+
+
+def _context_reduced_request(
+    request: ModelRequest,
+    *,
+    tail_messages: int,
+    max_text_chars: int,
+) -> ModelRequest:
+    system_messages = [
+        message
+        for message in request.messages
+        if message.role.value in {"system", "developer"}
+    ][:1]
+    tail = request.messages[-tail_messages:]
+    reduced = [*_dedupe_messages(system_messages, tail), *tail]
+    return request.model_copy(
+        update={
+            "messages": [_truncate_message(message, max_text_chars=max_text_chars) for message in reduced],
+            "metadata": {
+                **request.metadata,
+                "context_reduction_retry": True,
+                "context_reduction_original_messages": len(request.messages),
+                "context_reduction_messages": len(reduced),
+            },
+        }
+    )
+
+
+def _dedupe_messages(
+    protected: list[ModelMessage],
+    tail: list[ModelMessage],
+) -> list[ModelMessage]:
+    return [message for message in protected if message not in tail]
+
+
+def _truncate_message(message: ModelMessage, *, max_text_chars: int) -> ModelMessage:
+    blocks = []
+    for block in message.content:
+        if isinstance(block, TextContentBlock) and len(block.text) > max_text_chars:
+            half = max(1, max_text_chars // 2)
+            text = f"{block.text[:half]}\n...[snipped for context retry]...\n{block.text[-half:]}"
+            blocks.append(block.model_copy(update={"text": text}))
+        else:
+            blocks.append(block)
+    return message.model_copy(update={"content": blocks})
 
 
 __all__ = ["AgentRunExecutionResult", "AgentRuntimeKernel"]
